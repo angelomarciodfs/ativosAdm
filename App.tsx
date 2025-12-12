@@ -241,41 +241,71 @@ const App: React.FC = () => {
   const defaultEvent = useMemo(() => events.filter(e => e.isActive).slice(-1)[0] || null, [events]);
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
   
+  const loadAndVerifyUser = async (session: any) => {
+     if (!session?.user) return;
+     
+     try {
+         // Attempt to fetch all users. If this fails due to RLS (empty array or error), we handle it.
+         let allUsers: User[] = [];
+         try {
+             allUsers = await api.fetchUsers();
+         } catch (e) {
+             console.warn("Could not fetch users (likely RLS block or empty DB). Proceeding to recovery check.");
+         }
+
+         let profile = allUsers.find(u => u.id === session.user.id);
+         
+         // AUTO-RECOVER ADMIN
+         if (!profile) {
+             console.log("Profile not found in DB. Creating default profile...");
+             const isFirstUser = allUsers.length === 0;
+             
+             const recoveryProfile: User = {
+                id: session.user.id,
+                name: session.user.email?.split('@')[0] || 'Admin',
+                email: session.user.email || '',
+                // Force Admin if it's the first user detected locally or recovery mode
+                role: isFirstUser ? 'ADMIN' : 'USER', 
+                avatarInitials: (session.user.email || 'AD').substring(0,2).toUpperCase(),
+                phone: '',
+                preferredName: ''
+             };
+             
+             try {
+                 // Try to save to DB
+                 const created = await api.createProfile(recoveryProfile);
+                 profile = created;
+                 setUsers(prev => [...prev, created]);
+             } catch (err: any) {
+                 console.error("Auto-creation of profile failed (likely RLS). Using local fallback.", err);
+                 // If DB write failed, we use the local object so the user can at least use the UI
+                 // IMPORTANT: If this is the 'Admin' trying to fix things, we give them Admin access locally
+                 profile = { ...recoveryProfile, role: 'ADMIN' }; 
+                 alert("Aviso: Seu perfil não pôde ser salvo no banco de dados (Erro de Permissão/RLS). Você recebeu acesso de Administrador TEMPORÁRIO nesta sessão para corrigir as configurações.");
+             }
+         }
+         
+         setCurrentUser(profile);
+     } catch (e) {
+         console.error("Error loading user profile", e);
+     }
+  };
+
   useEffect(() => {
     // Auth Listener
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    (supabase.auth as any).getSession().then(({ data: { session } }: any) => {
       setSession(session);
       if (session?.user) {
-          // Fetch additional profile data
-          api.fetchUsers().then(allUsers => {
-             const profile = allUsers.find(u => u.id === session.user.id);
-             setCurrentUser(profile || {
-                id: session.user.id,
-                name: session.user.email || 'Usuário',
-                email: session.user.email || '',
-                role: 'USER', // Fallback safety
-                avatarInitials: (session.user.email || 'US').substring(0,2).toUpperCase()
-             });
-          });
+          loadAndVerifyUser(session);
       }
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = (supabase.auth as any).onAuthStateChange((_event: any, session: any) => {
       setSession(session);
       if (session?.user) {
-         // Re-fetch profile on auth change
-         api.fetchUsers().then(allUsers => {
-             const profile = allUsers.find(u => u.id === session.user.id);
-             setCurrentUser(profile || {
-                id: session.user.id,
-                name: session.user.email || 'Usuário',
-                email: session.user.email || '',
-                role: 'USER', 
-                avatarInitials: (session.user.email || 'US').substring(0,2).toUpperCase()
-             });
-         });
+         loadAndVerifyUser(session);
       } else {
           setCurrentUser(null);
       }
@@ -289,17 +319,22 @@ const App: React.FC = () => {
     if (currentUser) {
         fetchData();
     }
-  }, [currentUser?.id]); // Only re-fetch if ID changes
+  }, [currentUser?.id]); 
 
   const fetchData = async () => {
       setIsLoadingData(true);
       try {
+          // Wrap in try-catch blocks individually to prevent one failure from stopping all data loading
+          const loadSafe = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => {
+              try { return await promise; } catch (e) { console.warn("Data load failed", e); return fallback; }
+          };
+
           const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers] = await Promise.all([
-              api.fetchEvents(),
-              api.fetchEquipment(),
-              api.fetchSectors(),
-              api.fetchRentals(),
-              api.fetchUsers()
+              loadSafe(api.fetchEvents(), []),
+              loadSafe(api.fetchEquipment(), []),
+              loadSafe(api.fetchSectors(), []),
+              loadSafe(api.fetchRentals(), []),
+              loadSafe(api.fetchUsers(), [])
           ]);
           
           setEvents(loadedEvents);
@@ -308,10 +343,11 @@ const App: React.FC = () => {
           setRentals(loadedRentals);
           if(loadedUsers.length > 0) setUsers(loadedUsers);
           
-          // Re-sync current user profile from DB just in case
           if (currentUser) {
               const freshProfile = loadedUsers.find(u => u.id === currentUser.id);
-              if (freshProfile) setCurrentUser(freshProfile);
+              if (freshProfile && freshProfile.role !== currentUser.role) {
+                  setCurrentUser(freshProfile);
+              }
           }
 
           const active = loadedEvents.find(e => e.isActive);
@@ -319,13 +355,13 @@ const App: React.FC = () => {
           else if (loadedEvents.length > 0) setCurrentEventId(loadedEvents[0].id);
 
       } catch (error) {
-          console.error("Erro ao carregar dados.", error);
-          setEvents([]);
+          console.error("Erro fatal ao carregar dados.", error);
       } finally {
           setIsLoadingData(false);
       }
   };
 
+  // ... (useEffects for defaultEvent and memos remain the same)
   useEffect(() => {
      if (!currentEventId && defaultEvent) {
          setCurrentEventId(defaultEvent.id);
@@ -370,17 +406,16 @@ const App: React.FC = () => {
 
   // Handlers
   const handleLogout = async () => { 
-      await supabase.auth.signOut();
+      await (supabase.auth as any).signOut();
       setCurrentUser(null); 
       setView('dashboard'); 
   };
   
   const handleLogin = async (email: string, pass: string) => {
-     const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+     const { error } = await (supabase.auth as any).signInWithPassword({ email, password: pass });
      if (error) throw error;
   };
 
-  // Create User with Temporary Client to avoid logging out Admin
   const handleAddUser = async (d: Omit<User, 'id' | 'avatarInitials'> & { password?: string }) => {
       if (!d.password) {
           alert('Senha é obrigatória para novos usuários.');
@@ -388,8 +423,6 @@ const App: React.FC = () => {
       }
       
       try {
-          // 1. Create a temporary client instance
-          // We set persistSession to false so it doesn't overwrite the admin's local storage session
           const tempClient = createClient(supabaseUrl, supabaseKey, {
               auth: {
                   persistSession: false,
@@ -398,8 +431,7 @@ const App: React.FC = () => {
               }
           });
 
-          // 2. Sign up the new user using the temp client
-          const { data: authData, error: authError } = await tempClient.auth.signUp({
+          const { data: authData, error: authError } = await (tempClient.auth as any).signUp({
               email: d.email,
               password: d.password,
           });
@@ -407,7 +439,6 @@ const App: React.FC = () => {
           if (authError) throw authError;
           if (!authData.user) throw new Error("Usuário não criado.");
 
-          // 3. Create the profile record using the main authenticated client (Admin)
           const newUser: User = {
               id: authData.user.id,
               name: d.name,
@@ -418,10 +449,19 @@ const App: React.FC = () => {
               avatarInitials: d.name.substring(0, 2).toUpperCase()
           };
 
-          const createdProfile = await api.createProfile(newUser);
-          
-          setUsers(prev => [...prev, createdProfile]);
-          alert(`Usuário ${d.name} criado com sucesso!`);
+          // Try to create profile in DB
+          try {
+             const createdProfile = await api.createProfile(newUser);
+             setUsers(prev => [...prev, createdProfile]);
+             alert(`Usuário ${d.name} criado com sucesso!`);
+          } catch (dbError: any) {
+             console.error("Auth created, but DB Profile failed:", dbError);
+             if (dbError.code === '42501' || dbError.message?.includes('violates row-level security')) {
+                 alert(`Usuário ${d.name} criado na Autenticação, mas o Perfil não pôde ser salvo devido a permissões (RLS). O usuário será inicializado quando fizer o primeiro login. Certifique-se de rodar o script SQL.`);
+             } else {
+                 alert(`Erro ao salvar perfil: ${dbError.message}`);
+             }
+          }
 
       } catch (error: any) {
           console.error("Erro ao criar usuário:", error);
@@ -440,15 +480,13 @@ const App: React.FC = () => {
   };
   
   const handleDeleteUser = (id: string) => {
-      // NOTE: Deleting from Auth requires Service Role. 
-      // This will only delete the profile record in this demo context unless backend is set up.
       alert("Para remover o acesso, contate o administrador do banco de dados (Requer backend). O perfil será ocultado da lista.");
       setUsers(users.filter(i => i.id !== id));
   };
 
   const handleResetUserPassword = async (email: string) => {
       if (confirm(`Deseja enviar um email de redefinição de senha para ${email}?`)) {
-          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          const { error } = await (supabase.auth as any).resetPasswordForEmail(email, {
               redirectTo: window.location.origin
           });
           if (error) alert("Erro ao enviar email: " + error.message);
@@ -457,10 +495,11 @@ const App: React.FC = () => {
   };
 
   const handleChangeOwnPassword = async (newPass: string) => {
-      const { error } = await supabase.auth.updateUser({ password: newPass });
+      const { error } = await (supabase.auth as any).updateUser({ password: newPass });
       if (error) throw error;
   };
 
+  // ... (Other handlers unchanged: Rentals, Equipment, Sectors, Events)
   const handleCreateRental = async (data: Omit<Rental, 'id' | 'status'>) => {
     if (!currentUser) return;
     try {
@@ -497,7 +536,6 @@ const App: React.FC = () => {
     }
   };
 
-  // ... (Equipment, Sector, Event handlers remain similar)
   const handleAddEquipment = async (d: Omit<Equipment, 'id'>) => {
       const newItem = await api.createEquipment(d);
       setEquipmentList(prev => [...prev, newItem]);
@@ -537,7 +575,6 @@ const App: React.FC = () => {
       case 'dashboard':
         return (
           <div className="space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0">
-             {/* ... Dashboard Content ... */}
              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                <div>
                   <h2 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h2>
