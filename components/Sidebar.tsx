@@ -59,14 +59,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, cur
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0 md:shadow-sm
       `}>
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+        {/* LOGO SECTION - Centralizada */}
+        <div className="p-6 border-b border-gray-100 flex items-center justify-center relative">
           <img 
             src={SYSTEM_LOGO} 
             alt="Legendários" 
             className="h-16 w-auto object-contain" 
           />
-          {/* Close Button for Mobile */}
-          <button onClick={onClose} className="md:hidden text-gray-400 hover:text-gray-700">
+          {/* Close Button for Mobile - Posicionado Absoluto para não quebrar a centralização da logo */}
+          <button onClick={onClose} className="md:hidden absolute right-4 text-gray-400 hover:text-gray-700">
              <X size={24} />
           </button>
         </div>
@@ -114,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, cur
                <button
                 onClick={() => handleNavigation('new-rental')}
                 disabled={!currentEvent}
-                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-sm font-bold bg-white border border-gray-200 text-brand-600 hover:bg-brand-500 hover:text-white hover:border-brand-500 transition-all group disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                className="w-full flex items-center justify-start gap-3 px-3 py-3 rounded-lg text-sm font-bold bg-white border border-gray-200 text-brand-600 hover:bg-brand-500 hover:text-white hover:border-brand-500 transition-all group disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 <PlusCircle size={18} className="group-hover:rotate-90 transition-transform" />
                 Nova Locação
@@ -123,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, cur
               <button
                 onClick={() => handleNavigation('rentals')}
                 disabled={!currentEvent}
-                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-sm font-bold bg-white border border-gray-200 text-blue-600 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all group disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                className="w-full flex items-center justify-start gap-3 px-3 py-3 rounded-lg text-sm font-bold bg-white border border-gray-200 text-blue-600 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all group disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 <ArrowDownCircle size={18} />
                 Receber Devolução

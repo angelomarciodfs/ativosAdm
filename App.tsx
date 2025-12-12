@@ -8,7 +8,7 @@ import { ReportView } from './components/ReportView';
 import { LoginScreen } from './components/LoginScreen';
 import { SYSTEM_LOGO } from './constants';
 import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories } from './types';
-import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, Menu, CheckCircle, Loader, X, Lock, Save, User as UserIcon } from 'lucide-react';
+import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, Menu, CheckCircle, Loader, X, Lock, Save, User as UserIcon, KeyRound } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { supabase, isConfigured, supabaseUrl, supabaseKey } from './services/supabaseClient';
 import { api } from './services/database';
@@ -136,6 +136,83 @@ const SectorAllocationChart = ({ data }: { data: { name: string, count: number }
   );
 };
 
+// --- PASSWORD RECOVERY MODAL ---
+interface PasswordRecoveryModalProps {
+    onClose: () => void;
+}
+
+const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({ onClose }) => {
+    const [pass, setPass] = useState('');
+    const [confirm, setConfirm] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [msg, setMsg] = useState('');
+    const [isError, setIsError] = useState(false);
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setMsg(''); setIsError(false);
+
+        if (pass.length < 6) {
+            setMsg('A senha deve ter no mínimo 6 caracteres.'); setIsError(true); return;
+        }
+        if (pass !== confirm) {
+            setMsg('As senhas não conferem.'); setIsError(true); return;
+        }
+
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.updateUser({ password: pass });
+            if (error) throw error;
+            
+            setMsg('Senha redefinida com sucesso! Você já está logado.');
+            setTimeout(() => {
+                onClose();
+            }, 2000);
+        } catch (e: any) {
+            setMsg(e.message || 'Erro ao redefinir senha.'); setIsError(true);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in-95 border-t-4 border-brand-500">
+                <div className="p-6">
+                    <div className="flex flex-col items-center mb-6 text-center">
+                        <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center text-brand-600 mb-3">
+                            <KeyRound size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900">Redefinição de Senha</h3>
+                        <p className="text-gray-500 text-sm mt-1">Crie uma nova senha para sua conta.</p>
+                    </div>
+                    
+                    <form onSubmit={handleSave} className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-xs text-gray-500 font-semibold">Nova Senha</label>
+                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 focus:border-brand-500 focus:ring-1 focus:ring-brand-500" value={pass} onChange={e => setPass(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs text-gray-500 font-semibold">Confirmar Senha</label>
+                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 focus:border-brand-500 focus:ring-1 focus:ring-brand-500" value={confirm} onChange={e => setConfirm(e.target.value)} />
+                        </div>
+                        
+                        {msg && (
+                            <div className={`text-xs p-3 rounded-lg text-center font-bold ${isError ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                                {msg}
+                            </div>
+                        )}
+
+                        <button type="submit" disabled={loading} className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg flex justify-center items-center gap-2 shadow-lg shadow-brand-500/20 disabled:opacity-70 mt-2">
+                            {loading ? <Loader className="animate-spin" size={18} /> : 'Salvar Nova Senha'}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- PROFILE MODAL COMPONENT ---
 interface ProfileModalProps {
     user: User;
@@ -230,6 +307,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
   
   // Data States
   const [rentals, setRentals] = useState<Rental[]>([]);
@@ -302,7 +380,13 @@ const App: React.FC = () => {
 
     const {
       data: { subscription },
-    } = (supabase.auth as any).onAuthStateChange((_event: any, session: any) => {
+    } = (supabase.auth as any).onAuthStateChange(async (event: string, session: any) => {
+      console.log('Auth Event:', event);
+      
+      if (event === 'PASSWORD_RECOVERY') {
+          setIsRecoveryModalOpen(true);
+      }
+
       setSession(session);
       if (session?.user) {
          loadAndVerifyUser(session);
@@ -486,11 +570,14 @@ const App: React.FC = () => {
 
   const handleResetUserPassword = async (email: string) => {
       if (confirm(`Deseja enviar um email de redefinição de senha para ${email}?`)) {
+          // Garante que o redirecionamento aponte para a URL atual da janela (ex: http://localhost:5173)
+          const redirectUrl = window.location.origin;
+          
           const { error } = await (supabase.auth as any).resetPasswordForEmail(email, {
-              redirectTo: window.location.origin
+              redirectTo: redirectUrl
           });
           if (error) alert("Erro ao enviar email: " + error.message);
-          else alert("Email de redefinição enviado com sucesso!");
+          else alert(`Email de redefinição enviado com sucesso! Certifique-se que o Supabase permite redirecionar para: ${redirectUrl}`);
       }
   };
 
@@ -640,7 +727,13 @@ const App: React.FC = () => {
     }
   };
 
-  if (!currentUser) return <LoginScreen onLogin={handleLogin} />;
+  if (!currentUser) return (
+      <>
+          <LoginScreen onLogin={handleLogin} />
+          {/* Mostra o modal de recuperação mesmo se não estiver logado, se o link for válido */}
+          {isRecoveryModalOpen && <PasswordRecoveryModal onClose={() => { setIsRecoveryModalOpen(false); handleLogout(); }} />}
+      </>
+  );
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans flex-col md:flex-row">
@@ -679,6 +772,11 @@ const App: React.FC = () => {
             onClose={() => setIsProfileModalOpen(false)} 
             onUpdatePassword={handleChangeOwnPassword}
           />
+      )}
+
+      {/* MODAL DE RECUPERAÇÃO DE SENHA */}
+      {isRecoveryModalOpen && (
+          <PasswordRecoveryModal onClose={() => setIsRecoveryModalOpen(false)} />
       )}
     </div>
   );
