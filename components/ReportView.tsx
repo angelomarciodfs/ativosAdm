@@ -57,7 +57,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ rentals, equipment, curr
   const getMissingItemsList = (r: Rental) => {
       if (!r.accessories) return '';
       const missing: string[] = [];
-      const returned = r.returnedAccessories || {};
+      // CORREÇÃO AQUI: Cast para Partial<RentalAccessories> permite indexação
+      const returned = (r.returnedAccessories || {}) as Partial<RentalAccessories>;
       
       const labels: Record<string, string> = {
          charger: 'Carregador',
