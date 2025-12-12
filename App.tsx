@@ -156,12 +156,11 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-          // Em um app real, buscaríamos o profile do usuário no banco
           setCurrentUser({
               id: session.user.id,
               name: session.user.email || 'Usuário',
               email: session.user.email || '',
-              role: 'ADMIN', // Default para admin para teste, ideal buscar de 'profiles'
+              role: 'ADMIN', // Default para admin
               avatarInitials: (session.user.email || 'US').substring(0,2).toUpperCase()
           });
       }
@@ -197,6 +196,7 @@ const App: React.FC = () => {
   const fetchData = async () => {
       setIsLoadingData(true);
       try {
+          // Tentamos buscar do banco
           const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers] = await Promise.all([
               api.fetchEvents(),
               api.fetchEquipment(),
@@ -209,18 +209,16 @@ const App: React.FC = () => {
           setEquipmentList(loadedEq);
           setSectors(loadedSectors);
           setRentals(loadedRentals);
-          
-          // Se tiver usuários no banco, usa, senão mantém o mock/current session logic
           if(loadedUsers.length > 0) setUsers(loadedUsers);
           
-          // Set default active event
           const active = loadedEvents.find(e => e.isActive);
           if (active) setCurrentEventId(active.id);
           else if (loadedEvents.length > 0) setCurrentEventId(loadedEvents[0].id);
 
       } catch (error) {
-          console.error("Erro ao carregar dados:", error);
-          alert("Erro ao conectar ao banco de dados. Verifique as configurações do Supabase.");
+          console.error("Erro ao carregar dados. Verifique a conexão com o Supabase.", error);
+          // Fallback silencioso para UI não quebrar completamente
+          setEvents([]);
       } finally {
           setIsLoadingData(false);
       }
@@ -280,6 +278,17 @@ const App: React.FC = () => {
      if (error) throw error;
   };
 
+  const handleRegister = async (email: string, pass: string) => {
+      const { data, error } = await supabase.auth.signUp({
+          email,
+          password: pass,
+      });
+      if (error) throw error;
+      if (data.user) {
+          alert('Conta criada com sucesso! Se o login automático não ocorrer, tente entrar com suas credenciais.');
+      }
+  };
+
   const handleCreateRental = async (data: Omit<Rental, 'id' | 'status'>) => {
     if (!currentUser) return;
     try {
@@ -293,7 +302,6 @@ const App: React.FC = () => {
   };
 
   const handleReturn = async (id: string, returnedItems: RentalAccessories) => {
-    // Local check logic to determine status
     const r = rentals.find(item => item.id === id);
     if (!r) return;
 
@@ -317,15 +325,10 @@ const App: React.FC = () => {
     }
   };
 
-  // CRUD Handlers
-  // Note: For brevity in this refactor, I'm keeping the Optimistic UI or simple calls for Settings
-  // Ideally these should also be async/await with loading states in the ConfigurationView
-
   const handleAddEquipment = async (d: Omit<Equipment, 'id'>) => {
       const newItem = await api.createEquipment(d);
       setEquipmentList(prev => [...prev, newItem]);
   };
-  // Placeholder update/delete for simplicity in this turn
   const handleUpdateEquipment = (d: Equipment) => setEquipmentList(equipmentList.map(i => i.id === d.id ? d : i));
   const handleDeleteEquipment = (id: string) => setEquipmentList(equipmentList.filter(i => i.id !== id));
 
@@ -336,7 +339,7 @@ const App: React.FC = () => {
   const handleUpdateSector = (d: Sector) => setSectors(sectors.map(i => i.id === d.id ? d : i));
   const handleDeleteSector = (id: string) => setSectors(sectors.filter(i => i.id !== id));
 
-  const handleAddUser = (d: Omit<User, 'id' | 'avatarInitials'>) => setUsers([...users, {...d, id: `temp-${Math.random()}`, avatarInitials: '??'}]); // User creation is complex due to Auth
+  const handleAddUser = (d: Omit<User, 'id' | 'avatarInitials'>) => setUsers([...users, {...d, id: `temp-${Math.random()}`, avatarInitials: '??'}]); 
   const handleUpdateUser = (d: User) => setUsers(users.map(i => i.id === d.id ? d : i));
   const handleDeleteUser = (id: string) => setUsers(users.filter(i => i.id !== id));
 
@@ -429,7 +432,7 @@ const App: React.FC = () => {
     }
   };
 
-  if (!currentUser) return <LoginScreen onLogin={handleLogin} />;
+  if (!currentUser) return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} />;
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans flex-col md:flex-row">
@@ -454,7 +457,7 @@ const App: React.FC = () => {
         {!isConfigured && (
              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
                 <p className="text-red-700 font-bold">Configuração Necessária</p>
-                <p className="text-sm text-red-600">As variáveis de ambiente do Supabase (URL e Key) não foram encontradas. O app não funcionará corretamente.</p>
+                <p className="text-sm text-red-600">As variáveis de ambiente do Supabase (URL e Key) não foram encontradas.</p>
              </div>
         )}
         <div className="max-w-7xl mx-auto">{renderContent()}</div>
