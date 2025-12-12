@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Equipment, EquipmentCategory, Sector, User, UserRole, Event } from '../types';
-import { Plus, Search, Radio, Headphones, Battery, Trash2, Save, Users, Package, Pencil, Shield, Calendar, CheckCircle } from 'lucide-react';
+import { Plus, Search, Radio, Headphones, Battery, Trash2, Save, Users, Package, Pencil, Shield, Calendar, CheckCircle, Key, Lock } from 'lucide-react';
 
 interface ConfigurationViewProps {
   equipmentList: Equipment[];
@@ -12,13 +12,14 @@ interface ConfigurationViewProps {
   onUpdateSector: (sector: Sector) => void;
   onDeleteSector: (id: string) => void;
   userList: User[];
-  onAddUser: (user: Omit<User, 'id' | 'avatarInitials'>) => void;
+  onAddUser: (user: Omit<User, 'id' | 'avatarInitials'> & { password?: string }) => void;
   onUpdateUser: (user: User) => void;
   onDeleteUser: (id: string) => void;
   eventList: Event[];
   onAddEvent: (event: Omit<Event, 'id'>) => void;
   onUpdateEvent: (event: Event) => void;
   onDeleteEvent: (id: string) => void;
+  onResetUserPassword?: (email: string) => void;
 }
 
 export const ConfigurationView: React.FC<ConfigurationViewProps> = ({ 
@@ -26,7 +27,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   onAddEquipment, onUpdateEquipment, onDeleteEquipment,
   sectorList, onAddSector, onUpdateSector, onDeleteSector,
   userList, onAddUser, onUpdateUser, onDeleteUser,
-  eventList, onAddEvent, onUpdateEvent, onDeleteEvent
+  eventList, onAddEvent, onUpdateEvent, onDeleteEvent,
+  onResetUserPassword
 }) => {
   const [activeTab, setActiveTab] = useState<'equipment' | 'sectors' | 'users' | 'events'>('equipment');
   const [isAdding, setIsAdding] = useState(false);
@@ -52,7 +54,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
       preferredName: '',
       email: '',
       phone: '',
-      role: 'USER' as UserRole
+      role: 'USER' as UserRole,
+      password: ''
   });
 
   const [eventFormData, setEventFormData] = useState({
@@ -101,6 +104,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           const original = userList.find(u => u.id === editingId);
           if (original) onUpdateUser({ ...original, ...userFormData });
       } else {
+          // Passa a senha junto
           onAddUser(userFormData);
       }
       resetForms();
@@ -119,7 +123,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   const resetForms = () => {
     setEqFormData({ inventoryNumber: '', name: '', brand: '', model: '', category: 'Radio' });
     setSectorFormData({ name: '', coordinatorName: '', coordinatorPhone: '' });
-    setUserFormData({ name: '', preferredName: '', email: '', phone: '', role: 'USER' });
+    setUserFormData({ name: '', preferredName: '', email: '', phone: '', role: 'USER', password: '' });
     setEventFormData({ name: '', startDate: '', endDate: '', isActive: true });
     setIsAdding(false);
     setEditingId(null);
@@ -136,7 +140,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   };
 
   const startEditUser = (item: User) => {
-      setUserFormData({ name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role });
+      setUserFormData({ name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: '' });
       setEditingId(item.id); setIsAdding(true); setActiveTab('users');
   };
 
@@ -271,7 +275,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
             )}
 
             {activeTab === 'users' && (
-                <form onSubmit={handleUserSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <form onSubmit={handleUserSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                      <div className="space-y-1">
                         <label className="text-xs uppercase text-gray-500 font-bold">Nome</label>
                         <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-gray-900" value={userFormData.name} onChange={e => setUserFormData({...userFormData, name: e.target.value})} />
@@ -286,8 +290,23 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                             <option value="USER">Operador</option><option value="ADMIN">Administrador</option>
                         </select>
                     </div>
-                     <div className="md:col-span-3">
-                         <button type="submit" className="w-full md:w-auto px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg flex items-center justify-center gap-2"><Save size={18} /> Salvar</button>
+                    {/* Password Field - Only visible when adding new users */}
+                    {!editingId && (
+                        <div className="space-y-1 lg:col-span-1">
+                            <label className="text-xs uppercase text-brand-600 font-bold flex items-center gap-1"><Lock size={12} /> Senha Inicial</label>
+                            <input 
+                                required 
+                                type="text" 
+                                placeholder="Mínimo 6 caracteres"
+                                className="w-full bg-gray-50 border border-brand-200 rounded-lg p-2.5 text-gray-900" 
+                                value={userFormData.password} 
+                                onChange={e => setUserFormData({...userFormData, password: e.target.value})} 
+                                minLength={6}
+                            />
+                        </div>
+                    )}
+                     <div className="md:col-span-2 lg:col-span-3">
+                         <button type="submit" className="w-full md:w-auto px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg flex items-center justify-center gap-2"><Save size={18} /> {editingId ? 'Atualizar Usuário' : 'Criar Usuário'}</button>
                     </div>
                 </form>
             )}
@@ -343,7 +362,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                     </>
                 )}
 
-                {/* Other tables simplified for brevity */}
                  {activeTab === 'equipment' && (
                      <>
                     <thead><tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500"><th className="p-4">Tag</th><th className="p-4">Modelo</th><th className="p-4 text-right">Ações</th></tr></thead>
@@ -388,7 +406,14 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                             <tr key={item.id} className="hover:bg-gray-50">
                                 <td className="p-4 text-gray-900 font-bold">{item.name}</td>
                                 <td className="p-4 text-gray-500">{item.email}</td>
-                                <td className="p-4 text-right">
+                                <td className="p-4 text-right flex items-center justify-end gap-1">
+                                    <button 
+                                        onClick={() => onResetUserPassword && onResetUserPassword(item.email)} 
+                                        className="p-2 text-gray-400 hover:text-orange-500" 
+                                        title="Enviar email de redefinição de senha"
+                                    >
+                                        <Key size={16}/>
+                                    </button>
                                     <button onClick={() => startEditUser(item)} className="p-2 text-gray-400 hover:text-blue-500"><Pencil size={16}/></button>
                                     <button onClick={() => onDeleteUser(item.id)} className="p-2 text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
                                 </td>

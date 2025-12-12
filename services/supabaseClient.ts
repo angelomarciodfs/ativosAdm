@@ -18,8 +18,8 @@ const isValidUrl = (url: string | undefined): boolean => {
 };
 
 // Lógica de fallback: Usa variável de ambiente se válida, senão usa a chave fornecida
-const supabaseUrl = (envUrl && isValidUrl(envUrl)) ? envUrl : DEFAULT_URL;
-const supabaseKey = envKey || DEFAULT_KEY;
+export const supabaseUrl = (envUrl && isValidUrl(envUrl)) ? envUrl : DEFAULT_URL;
+export const supabaseKey = envKey || DEFAULT_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 

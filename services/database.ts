@@ -128,12 +128,38 @@ export const api = {
   },
 
   // USERS
-  // Nota: Em produção, usuários devem ser gerenciados via Supabase Auth. 
-  // Aqui estamos usando uma tabela 'profiles' pública para simplificar a demo.
   fetchUsers: async () => {
     const { data, error } = await supabase.from('profiles').select('*');
     if (error) throw error;
     return data.map(mapUser);
+  },
+  
+  // Cria o perfil na tabela 'profiles' após o Auth criar o usuário
+  createProfile: async (user: User) => {
+      const { data, error } = await supabase.from('profiles').insert({
+          id: user.id, // ID deve vir do Auth
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          avatar_initials: user.avatarInitials,
+          phone: user.phone,
+          preferred_name: user.preferredName
+      }).select().single();
+      
+      if (error) throw error;
+      return mapUser(data);
+  },
+
+  updateProfile: async (user: User) => {
+      const { data, error } = await supabase.from('profiles').update({
+          name: user.name,
+          role: user.role,
+          phone: user.phone,
+          preferred_name: user.preferredName
+      }).eq('id', user.id).select().single();
+
+      if (error) throw error;
+      return mapUser(data);
   },
 
   // RENTALS

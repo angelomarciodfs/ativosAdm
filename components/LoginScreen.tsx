@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
-import { Lock, User, ArrowRight, Loader, UserPlus } from 'lucide-react';
+import { Lock, User, ArrowRight, Loader } from 'lucide-react';
 import { SYSTEM_LOGO } from '../constants';
 
 interface LoginScreenProps {
   onLogin: (email: string, password: string) => Promise<void>;
-  onRegister: (email: string, password: string) => Promise<void>;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isRegistering, setIsRegistering] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,19 +18,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
     setLoading(true);
 
     try {
-      if (isRegistering) {
-          await onRegister(email, password);
-          // Don't auto-switch, user might need to confirm email or just log in now.
-      } else {
-          await onLogin(email, password);
-      }
+      await onLogin(email, password);
     } catch (err: any) {
-      console.error('Auth failed', err);
-      let msg = 'Falha na operação.';
-      if (err.message) {
-         if (err.message.includes('Invalid login credentials')) msg = 'Email ou senha incorretos.';
-         else if (err.message.includes('User already registered')) msg = 'Este email já está cadastrado.';
-         else msg = err.message;
+      console.error('Login failed', err);
+      let msg = 'Falha na autenticação.';
+      if (err.message && err.message.includes('Invalid login credentials')) {
+         msg = 'Email ou senha incorretos.';
+      } else if (err.message) {
+         msg = err.message;
       }
       setError(msg);
     } finally {
@@ -55,9 +48,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
            />
            <div className="text-center mt-4">
              <p className="text-gray-500 text-sm font-medium leading-tight">Controle de Ativos Adm</p>
-             <p className="text-brand-600 text-sm font-bold leading-tight mt-1">
-                 {isRegistering ? 'Criar Nova Conta' : 'Acesso ao Sistema'}
-             </p>
+             <p className="text-brand-600 text-sm font-bold leading-tight mt-1">Acesso ao Sistema</p>
            </div>
         </div>
 
@@ -88,7 +79,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                 className="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 pl-10 pr-4 text-gray-900 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-gray-400"
                 placeholder="••••••"
                 required
-                minLength={6}
               />
             </div>
           </div>
@@ -102,25 +92,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-3 text-white font-bold rounded-lg transition-all flex items-center justify-center gap-2 mt-4 shadow-lg active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed ${isRegistering ? 'bg-gray-800 hover:bg-gray-900 shadow-gray-800/20' : 'bg-brand-500 hover:bg-brand-600 shadow-brand-500/20'}`}
+            className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg transition-all flex items-center justify-center gap-2 mt-4 shadow-lg shadow-brand-500/20 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {loading ? <Loader className="animate-spin" size={18} /> : (
-                isRegistering ? <>Criar Conta <UserPlus size={18} /></> : <>Acessar <ArrowRight size={18} /></>
-            )}
+            {loading ? <Loader className="animate-spin" size={18} /> : <>Acessar <ArrowRight size={18} /></>}
           </button>
         </form>
-        
-        <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-             <button 
-                type="button"
-                onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
-                className="text-sm text-brand-600 hover:text-brand-700 font-medium hover:underline transition-all"
-             >
-                {isRegistering 
-                    ? 'Já tem uma conta? Fazer Login' 
-                    : 'Primeiro acesso? Criar conta admin'}
-             </button>
-        </div>
       </div>
     </div>
   );

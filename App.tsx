@@ -8,11 +8,13 @@ import { ReportView } from './components/ReportView';
 import { LoginScreen } from './components/LoginScreen';
 import { SYSTEM_LOGO } from './constants';
 import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories } from './types';
-import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, Menu, CheckCircle, Loader } from 'lucide-react';
+import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, Menu, CheckCircle, Loader, X, Lock, Save, User as UserIcon } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { supabase, isConfigured } from './services/supabaseClient';
+import { supabase, isConfigured, supabaseUrl, supabaseKey } from './services/supabaseClient';
 import { api } from './services/database';
+import { createClient } from '@supabase/supabase-js';
 
+// ... (Keeping InventoryStatusChart and SectorAllocationChart as is)
 const InventoryStatusChart = ({ equipment, rentals, currentEvent }: { equipment: Equipment[], rentals: Rental[], currentEvent: Event | null }) => {
   const activeRentals = rentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
 
@@ -134,12 +136,100 @@ const SectorAllocationChart = ({ data }: { data: { name: string, count: number }
   );
 };
 
+// --- PROFILE MODAL COMPONENT ---
+interface ProfileModalProps {
+    user: User;
+    onClose: () => void;
+    onUpdatePassword: (newPass: string) => Promise<void>;
+}
+
+const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onUpdatePassword }) => {
+    const [pass, setPass] = useState('');
+    const [confirm, setConfirm] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [msg, setMsg] = useState('');
+    const [isError, setIsError] = useState(false);
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setMsg(''); setIsError(false);
+
+        if (pass.length < 6) {
+            setMsg('A senha deve ter no mínimo 6 caracteres.'); setIsError(true); return;
+        }
+        if (pass !== confirm) {
+            setMsg('As senhas não conferem.'); setIsError(true); return;
+        }
+
+        setLoading(true);
+        try {
+            await onUpdatePassword(pass);
+            setMsg('Senha atualizada com sucesso!');
+            setPass(''); setConfirm('');
+        } catch (e: any) {
+            setMsg(e.message || 'Erro ao atualizar senha.'); setIsError(true);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in-95">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <UserIcon className="text-brand-600" /> Meu Perfil
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20} /></button>
+                </div>
+                <div className="p-6">
+                    <div className="mb-6 flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-2xl font-bold border border-brand-200">
+                            {user.avatarInitials}
+                        </div>
+                        <div>
+                            <p className="font-bold text-lg text-gray-900">{user.name}</p>
+                            <p className="text-gray-500 text-sm">{user.email}</p>
+                            <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded border border-brand-100 mt-1 inline-block">
+                                {user.role === 'ADMIN' ? 'Administrador' : 'Operador'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <form onSubmit={handleSave} className="space-y-4 pt-4 border-t border-gray-100">
+                        <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Alterar Senha</h4>
+                        <div className="space-y-2">
+                            <label className="text-xs text-gray-500 font-semibold">Nova Senha</label>
+                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5" value={pass} onChange={e => setPass(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs text-gray-500 font-semibold">Confirmar Senha</label>
+                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5" value={confirm} onChange={e => setConfirm(e.target.value)} />
+                        </div>
+                        
+                        {msg && (
+                            <div className={`text-xs p-2 rounded text-center font-bold ${isError ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                {msg}
+                            </div>
+                        )}
+
+                        <button type="submit" disabled={loading} className="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg flex justify-center items-center gap-2 shadow-lg shadow-brand-500/20 disabled:opacity-70">
+                            {loading ? <Loader className="animate-spin" size={16} /> : <><Lock size={16} /> Atualizar Senha</>}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [session, setSession] = useState<any>(null);
   const [view, setView] = useState<ViewState>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
   // Data States
   const [rentals, setRentals] = useState<Rental[]>([]);
@@ -156,12 +246,16 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-          setCurrentUser({
-              id: session.user.id,
-              name: session.user.email || 'Usuário',
-              email: session.user.email || '',
-              role: 'ADMIN', // Default para admin
-              avatarInitials: (session.user.email || 'US').substring(0,2).toUpperCase()
+          // Fetch additional profile data
+          api.fetchUsers().then(allUsers => {
+             const profile = allUsers.find(u => u.id === session.user.id);
+             setCurrentUser(profile || {
+                id: session.user.id,
+                name: session.user.email || 'Usuário',
+                email: session.user.email || '',
+                role: 'USER', // Fallback safety
+                avatarInitials: (session.user.email || 'US').substring(0,2).toUpperCase()
+             });
           });
       }
     });
@@ -171,13 +265,17 @@ const App: React.FC = () => {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user) {
-          setCurrentUser({
-              id: session.user.id,
-              name: session.user.email || 'Usuário',
-              email: session.user.email || '',
-              role: 'ADMIN',
-              avatarInitials: (session.user.email || 'US').substring(0,2).toUpperCase()
-          });
+         // Re-fetch profile on auth change
+         api.fetchUsers().then(allUsers => {
+             const profile = allUsers.find(u => u.id === session.user.id);
+             setCurrentUser(profile || {
+                id: session.user.id,
+                name: session.user.email || 'Usuário',
+                email: session.user.email || '',
+                role: 'USER', 
+                avatarInitials: (session.user.email || 'US').substring(0,2).toUpperCase()
+             });
+         });
       } else {
           setCurrentUser(null);
       }
@@ -191,12 +289,11 @@ const App: React.FC = () => {
     if (currentUser) {
         fetchData();
     }
-  }, [currentUser]);
+  }, [currentUser?.id]); // Only re-fetch if ID changes
 
   const fetchData = async () => {
       setIsLoadingData(true);
       try {
-          // Tentamos buscar do banco
           const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers] = await Promise.all([
               api.fetchEvents(),
               api.fetchEquipment(),
@@ -211,13 +308,18 @@ const App: React.FC = () => {
           setRentals(loadedRentals);
           if(loadedUsers.length > 0) setUsers(loadedUsers);
           
+          // Re-sync current user profile from DB just in case
+          if (currentUser) {
+              const freshProfile = loadedUsers.find(u => u.id === currentUser.id);
+              if (freshProfile) setCurrentUser(freshProfile);
+          }
+
           const active = loadedEvents.find(e => e.isActive);
           if (active) setCurrentEventId(active.id);
           else if (loadedEvents.length > 0) setCurrentEventId(loadedEvents[0].id);
 
       } catch (error) {
-          console.error("Erro ao carregar dados. Verifique a conexão com o Supabase.", error);
-          // Fallback silencioso para UI não quebrar completamente
+          console.error("Erro ao carregar dados.", error);
           setEvents([]);
       } finally {
           setIsLoadingData(false);
@@ -278,15 +380,85 @@ const App: React.FC = () => {
      if (error) throw error;
   };
 
-  const handleRegister = async (email: string, pass: string) => {
-      const { data, error } = await supabase.auth.signUp({
-          email,
-          password: pass,
-      });
-      if (error) throw error;
-      if (data.user) {
-          alert('Conta criada com sucesso! Se o login automático não ocorrer, tente entrar com suas credenciais.');
+  // Create User with Temporary Client to avoid logging out Admin
+  const handleAddUser = async (d: Omit<User, 'id' | 'avatarInitials'> & { password?: string }) => {
+      if (!d.password) {
+          alert('Senha é obrigatória para novos usuários.');
+          return;
       }
+      
+      try {
+          // 1. Create a temporary client instance
+          // We set persistSession to false so it doesn't overwrite the admin's local storage session
+          const tempClient = createClient(supabaseUrl, supabaseKey, {
+              auth: {
+                  persistSession: false,
+                  autoRefreshToken: false,
+                  detectSessionInUrl: false
+              }
+          });
+
+          // 2. Sign up the new user using the temp client
+          const { data: authData, error: authError } = await tempClient.auth.signUp({
+              email: d.email,
+              password: d.password,
+          });
+
+          if (authError) throw authError;
+          if (!authData.user) throw new Error("Usuário não criado.");
+
+          // 3. Create the profile record using the main authenticated client (Admin)
+          const newUser: User = {
+              id: authData.user.id,
+              name: d.name,
+              email: d.email,
+              role: d.role,
+              phone: d.phone,
+              preferredName: d.preferredName,
+              avatarInitials: d.name.substring(0, 2).toUpperCase()
+          };
+
+          const createdProfile = await api.createProfile(newUser);
+          
+          setUsers(prev => [...prev, createdProfile]);
+          alert(`Usuário ${d.name} criado com sucesso!`);
+
+      } catch (error: any) {
+          console.error("Erro ao criar usuário:", error);
+          alert(`Erro: ${error.message}`);
+      }
+  };
+
+  const handleUpdateUser = async (d: User) => {
+      try {
+          const updated = await api.updateProfile(d);
+          setUsers(users.map(u => u.id === d.id ? updated : u));
+      } catch (error) {
+          console.error(error);
+          alert("Erro ao atualizar usuário.");
+      }
+  };
+  
+  const handleDeleteUser = (id: string) => {
+      // NOTE: Deleting from Auth requires Service Role. 
+      // This will only delete the profile record in this demo context unless backend is set up.
+      alert("Para remover o acesso, contate o administrador do banco de dados (Requer backend). O perfil será ocultado da lista.");
+      setUsers(users.filter(i => i.id !== id));
+  };
+
+  const handleResetUserPassword = async (email: string) => {
+      if (confirm(`Deseja enviar um email de redefinição de senha para ${email}?`)) {
+          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+              redirectTo: window.location.origin
+          });
+          if (error) alert("Erro ao enviar email: " + error.message);
+          else alert("Email de redefinição enviado com sucesso!");
+      }
+  };
+
+  const handleChangeOwnPassword = async (newPass: string) => {
+      const { error } = await supabase.auth.updateUser({ password: newPass });
+      if (error) throw error;
   };
 
   const handleCreateRental = async (data: Omit<Rental, 'id' | 'status'>) => {
@@ -325,6 +497,7 @@ const App: React.FC = () => {
     }
   };
 
+  // ... (Equipment, Sector, Event handlers remain similar)
   const handleAddEquipment = async (d: Omit<Equipment, 'id'>) => {
       const newItem = await api.createEquipment(d);
       setEquipmentList(prev => [...prev, newItem]);
@@ -338,10 +511,6 @@ const App: React.FC = () => {
   };
   const handleUpdateSector = (d: Sector) => setSectors(sectors.map(i => i.id === d.id ? d : i));
   const handleDeleteSector = (id: string) => setSectors(sectors.filter(i => i.id !== id));
-
-  const handleAddUser = (d: Omit<User, 'id' | 'avatarInitials'>) => setUsers([...users, {...d, id: `temp-${Math.random()}`, avatarInitials: '??'}]); 
-  const handleUpdateUser = (d: User) => setUsers(users.map(i => i.id === d.id ? d : i));
-  const handleDeleteUser = (id: string) => setUsers(users.filter(i => i.id !== id));
 
   const handleAddEvent = async (d: Omit<Event, 'id'>) => {
       const newItem = await api.createEvent(d);
@@ -368,7 +537,8 @@ const App: React.FC = () => {
       case 'dashboard':
         return (
           <div className="space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+             {/* ... Dashboard Content ... */}
+             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                <div>
                   <h2 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h2>
                   <p className="text-gray-500 mt-1 text-sm md:text-base">
@@ -427,12 +597,13 @@ const App: React.FC = () => {
             sectorList={sectors} onAddSector={handleAddSector} onUpdateSector={handleUpdateSector} onDeleteSector={handleDeleteSector}
             userList={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser}
             eventList={events} onAddEvent={handleAddEvent} onUpdateEvent={handleUpdateEvent} onDeleteEvent={handleDeleteEvent}
+            onResetUserPassword={handleResetUserPassword}
         />;
       default: return <div>View not found</div>;
     }
   };
 
-  if (!currentUser) return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} />;
+  if (!currentUser) return <LoginScreen onLogin={handleLogin} />;
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans flex-col md:flex-row">
@@ -448,6 +619,7 @@ const App: React.FC = () => {
         onChangeView={handleViewChange} 
         currentUser={currentUser} 
         onLogout={handleLogout} 
+        onProfileClick={() => setIsProfileModalOpen(true)}
         currentEvent={currentEvent}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -462,6 +634,15 @@ const App: React.FC = () => {
         )}
         <div className="max-w-7xl mx-auto">{renderContent()}</div>
       </main>
+
+      {/* MODAL DE PERFIL */}
+      {isProfileModalOpen && currentUser && (
+          <ProfileModal 
+            user={currentUser} 
+            onClose={() => setIsProfileModalOpen(false)} 
+            onUpdatePassword={handleChangeOwnPassword}
+          />
+      )}
     </div>
   );
 };

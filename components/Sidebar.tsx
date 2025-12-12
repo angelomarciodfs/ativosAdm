@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Radio, History, PlusCircle, Settings, LogOut, ClipboardList, Calendar, X, ArrowDownCircle } from 'lucide-react';
+import { LayoutDashboard, Radio, History, PlusCircle, Settings, LogOut, ClipboardList, Calendar, X, ArrowDownCircle, ChevronRight } from 'lucide-react';
 import { ViewState, User, Event } from '../types';
 import { SYSTEM_LOGO } from '../constants';
 
@@ -8,12 +8,13 @@ interface SidebarProps {
   onChangeView: (view: ViewState) => void;
   currentUser: User | null;
   onLogout: () => void;
+  onProfileClick?: () => void;
   currentEvent: Event | null;
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, currentUser, onLogout, currentEvent, isOpen = false, onClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, currentUser, onLogout, onProfileClick, currentEvent, isOpen = false, onClose }) => {
   const isAdmin = currentUser?.role === 'ADMIN';
 
   const menuItems = [
@@ -131,23 +132,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, cur
         </div>
 
         <div className="p-4 border-t border-gray-100 bg-gray-50">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white transition-colors border border-transparent hover:border-gray-200">
-              <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700 border border-brand-200 shrink-0">
+          <div 
+            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white transition-colors border border-transparent hover:border-gray-200 cursor-pointer group"
+            onClick={onProfileClick}
+            title="Ver Perfil / Alterar Senha"
+          >
+              <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700 border border-brand-200 shrink-0 group-hover:scale-105 transition-transform">
                   {currentUser?.avatarInitials || 'US'}
               </div>
               <div className="flex-1 overflow-hidden min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{currentUser?.name || 'Usuário'}</p>
+                  <div className="flex items-center justify-between">
+                     <p className="text-sm font-medium text-gray-900 truncate group-hover:text-brand-600 transition-colors">{currentUser?.name || 'Usuário'}</p>
+                     <ChevronRight size={14} className="text-gray-300 group-hover:text-brand-500" />
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <span className={`w-1.5 h-1.5 rounded-full ${isAdmin ? 'bg-brand-500' : 'bg-blue-500'}`}></span>
                     <p className="text-xs text-gray-500 truncate capitalize">{currentUser?.role === 'ADMIN' ? 'Administrador' : 'Operador'}</p>
                   </div>
               </div>
-              <button 
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-200">
+             <button 
                 onClick={onLogout}
-                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all shrink-0"
-                title="Sair"
+                className="w-full flex items-center justify-center gap-2 px-2 py-1.5 text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
               >
-                 <LogOut size={16} />
+                 <LogOut size={14} /> Sair do Sistema
               </button>
           </div>
         </div>
