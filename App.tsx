@@ -8,7 +8,7 @@ import { ConfigurationView } from './components/ConfigurationView';
 import { ReportView } from './components/ReportView';
 import { ProfileView } from './components/ProfileView';
 import { LoginScreen } from './components/LoginScreen';
-import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories, EquipmentItem } from './types';
+import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories, EquipmentItem, Channel } from './types';
 import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, CheckCircle, Loader, Lightbulb, RefreshCw, Menu } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { supabase, supabaseUrl, supabaseKey } from './services/supabaseClient';
@@ -114,13 +114,14 @@ const App: React.FC = () => {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   
-  const [configTab, setConfigTab] = useState<'events' | 'inventory' | 'sectors' | 'users'>('events');
+  const [configTab, setConfigTab] = useState<'events' | 'inventory' | 'sectors' | 'users' | 'channels'>('events');
   const [configInventorySubTab, setConfigInventorySubTab] = useState<'ativos' | 'itens'>('ativos');
 
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [items, setItems] = useState<EquipmentItem[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
@@ -181,13 +182,14 @@ const App: React.FC = () => {
           const loadSafe = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => { 
               try { return await promise || fallback; } catch (e) { return fallback; } 
           };
-          const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedItems] = await Promise.all([
+          const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedItems, loadedChannels] = await Promise.all([
               loadSafe(api.fetchEvents(), []),
               loadSafe(api.fetchEquipment(), []),
               loadSafe(api.fetchSectors(), []),
               loadSafe(api.fetchRentals(), []),
               loadSafe(api.fetchUsers(), []),
-              loadSafe(api.fetchItems(), [])
+              loadSafe(api.fetchItems(), []),
+              loadSafe(api.fetchChannels(), [])
           ]);
           setEvents(loadedEvents);
           setEquipmentList(loadedEq);
@@ -195,6 +197,7 @@ const App: React.FC = () => {
           setRentals(loadedRentals);
           setItems(loadedItems);
           setUsers(loadedUsers);
+          setChannels(loadedChannels);
           const active = loadedEvents.find(e => e.isActive) || (loadedEvents.length > 0 ? loadedEvents[0] : null);
           if (active) setCurrentEventId(active.id);
       } finally { setIsLoadingData(false); }
@@ -283,6 +286,10 @@ const App: React.FC = () => {
             onAddSector={async (d) => { await api.createSector(d); await fetchData(); }} 
             onUpdateSector={async (d) => { await api.updateSector(d); await fetchData(); }} 
             onDeleteSector={async (id) => { await api.deleteSector(id); await fetchData(); }}
+            channelList={channels}
+            onAddChannel={async (d) => { await api.createChannel(d); await fetchData(); }}
+            onUpdateChannel={async (d) => { await api.updateChannel(d); await fetchData(); }}
+            onDeleteChannel={async (id) => { await api.deleteChannel(id); await fetchData(); }}
             userList={users} 
             onAddUser={async (d) => { 
                 const tempClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });

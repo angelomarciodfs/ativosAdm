@@ -7,6 +7,13 @@ export enum RentalStatus {
   PARTIAL = 'Parcial / Pendente'
 }
 
+export interface Channel {
+  id: string;
+  name: string; // Ex: UV-01
+  frequency: string; // Ex: 144.925
+  type: string; // VHF / UHF
+}
+
 export interface EquipmentItem {
   id: string;
   name: string;
@@ -29,6 +36,7 @@ export interface Sector {
   name: string;
   coordinatorName?: string;
   coordinatorPhone?: string;
+  channelId?: string; // Vínculo com Canal
 }
 
 export interface Event {

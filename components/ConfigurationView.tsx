@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Equipment, Sector, User, UserRole, Event, EquipmentItem } from '../types';
-import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key } from 'lucide-react';
+import { Equipment, Sector, User, UserRole, Event, EquipmentItem, Channel } from '../types';
+import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key, Radio as RadioIcon, Activity } from 'lucide-react';
 
 interface ConfigurationViewProps {
   equipmentList: Equipment[];
@@ -16,6 +16,10 @@ interface ConfigurationViewProps {
   onAddSector: (sector: Omit<Sector, 'id'>) => void;
   onUpdateSector: (sector: Sector) => void;
   onDeleteSector: (id: string) => void;
+  channelList: Channel[];
+  onAddChannel: (channel: Omit<Channel, 'id'>) => void;
+  onUpdateChannel: (channel: Channel) => void;
+  onDeleteChannel: (id: string) => void;
   userList: User[];
   onAddUser: (user: Omit<User, 'id' | 'avatarInitials'> & { password?: string }) => void;
   onUpdateUser: (user: User & { password?: string }) => void;
@@ -24,7 +28,7 @@ interface ConfigurationViewProps {
   onAddEvent: (event: Omit<Event, 'id'>) => void;
   onUpdateEvent: (event: Event) => void;
   onDeleteEvent: (id: string) => void;
-  activeTab: 'events' | 'inventory' | 'sectors' | 'users';
+  activeTab: 'events' | 'inventory' | 'sectors' | 'users' | 'channels';
   setActiveTab: (tab: any) => void;
   inventorySubTab: 'ativos' | 'itens';
   setInventorySubTab: (tab: any) => void;
@@ -34,6 +38,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   equipmentList, onAddEquipment, onUpdateEquipment, onDeleteEquipment,
   itemList, onAddItem, onUpdateItem, onDeleteItem,
   sectorList, onAddSector, onUpdateSector, onDeleteSector,
+  channelList, onAddChannel, onUpdateChannel, onDeleteChannel,
   userList, onAddUser, onUpdateUser, onDeleteUser,
   eventList, onAddEvent, onUpdateEvent, onDeleteEvent,
   activeTab, setActiveTab, inventorySubTab, setInventorySubTab
@@ -45,14 +50,32 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   // Form States
   const [eqFormData, setEqFormData] = useState({ inventoryNumber: '', brand: '', model: '', category: '' });
   const [itemFormData, setItemFormData] = useState({ name: '' });
-  const [sectorFormData, setSectorFormData] = useState({ name: '', coordinatorName: '', coordinatorPhone: '' });
+  const [sectorFormData, setSectorFormData] = useState({ name: '', coordinatorName: '', coordinatorPhone: '', channelId: '' });
+  const [channelFormData, setChannelFormData] = useState({ name: '', frequency: '', type: 'VHF' });
   const [userFormData, setUserFormData] = useState({ name: '', preferredName: '', email: '', phone: '', role: 'USER' as UserRole, password: '' });
   const [eventFormData, setEventFormData] = useState({ name: '', startDate: '', endDate: '', isActive: true });
+
+  const maskChannel = (val: string) => {
+      let clean = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      if (clean.length > 2) {
+          return clean.substring(0, 2) + '-' + clean.substring(2, 4);
+      }
+      return clean;
+  };
+
+  const maskFrequency = (val: string) => {
+      let clean = val.replace(/\D/g, '');
+      if (clean.length > 3) {
+          return clean.substring(0, 3) + '.' + clean.substring(3, 6);
+      }
+      return clean;
+  };
 
   const resetForms = () => {
     setEqFormData({ inventoryNumber: '', brand: '', model: '', category: '' });
     setItemFormData({ name: '' });
-    setSectorFormData({ name: '', coordinatorName: '', coordinatorPhone: '' });
+    setSectorFormData({ name: '', coordinatorName: '', coordinatorPhone: '', channelId: '' });
+    setChannelFormData({ name: '', frequency: '', type: 'VHF' });
     setUserFormData({ name: '', preferredName: '', email: '', phone: '', role: 'USER', password: '' });
     setEventFormData({ name: '', startDate: '', endDate: '', isActive: true });
     setIsAdding(false);
@@ -75,6 +98,9 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     } else if (activeTab === 'sectors') {
         if (editingId) onUpdateSector({ id: editingId, ...sectorFormData });
         else onAddSector(sectorFormData);
+    } else if (activeTab === 'channels') {
+        if (editingId) onUpdateChannel({ id: editingId, ...channelFormData });
+        else onAddChannel(channelFormData);
     } else if (activeTab === 'users') {
         if (editingId) onUpdateUser({ id: editingId, ...userFormData, avatarInitials: userFormData.name.substring(0, 2).toUpperCase() });
         else onAddUser(userFormData);
@@ -89,6 +115,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     const term = searchTerm.toLowerCase();
     if (activeTab === 'events') return eventList.filter(e => e.name.toLowerCase().includes(term));
     if (activeTab === 'sectors') return sectorList.filter(s => s.name.toLowerCase().includes(term));
+    if (activeTab === 'channels') return channelList.filter(c => c.name.toLowerCase().includes(term) || c.frequency.includes(term));
     if (activeTab === 'users') return userList.filter(u => u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term));
     if (activeTab === 'inventory') {
         if (inventorySubTab === 'ativos') return equipmentList.filter(eq => eq.inventoryNumber.toLowerCase().includes(term));
@@ -106,6 +133,12 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
       if (!userIdOrName) return 'Sistema';
       const user = userList.find(u => u.id === userIdOrName);
       return user ? user.name : userIdOrName;
+  };
+
+  const resolveChannelName = (channelId?: string) => {
+      if (!channelId) return '-';
+      const ch = channelList.find(c => c.id === channelId);
+      return ch ? `${ch.name} (${ch.frequency})` : '-';
   };
 
   return (
@@ -129,6 +162,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
         {[
             { id: 'events', label: 'Eventos', icon: Calendar },
             { id: 'inventory', label: 'Inventário', icon: Package },
+            { id: 'channels', label: 'Canais', icon: RadioIcon },
             { id: 'sectors', label: 'Setores', icon: Users },
             { id: 'users', label: 'Usuários', icon: Shield }
         ].map(tab => (
@@ -169,6 +203,51 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-6">
+                {activeTab === 'channels' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do Canal</label>
+                            <input required type="text" placeholder="Ex: UV-01" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono" value={channelFormData.name} onChange={e => setChannelFormData({...channelFormData, name: maskChannel(e.target.value)})} maxLength={5} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs uppercase text-gray-500 font-bold">Frequência</label>
+                            <input required type="text" placeholder="Ex: 144.925" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono" value={channelFormData.frequency} onChange={e => setChannelFormData({...channelFormData, frequency: maskFrequency(e.target.value)})} maxLength={7} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs uppercase text-gray-500 font-bold">Tipo</label>
+                            <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={channelFormData.type} onChange={e => setChannelFormData({...channelFormData, type: e.target.value})}>
+                                <option value="VHF">VHF</option>
+                                <option value="UHF">UHF</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'sectors' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs uppercase text-gray-500 font-bold">Sigla do Setor</label>
+                            <input required type="text" placeholder="Ex: ADM" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold uppercase" value={sectorFormData.name} onChange={e => setSectorFormData({...sectorFormData, name: e.target.value.toUpperCase()})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs uppercase text-gray-500 font-bold">Canal Operacional</label>
+                            <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.channelId} onChange={e => setSectorFormData({...sectorFormData, channelId: e.target.value})}>
+                                <option value="">Sem Canal Definido</option>
+                                {channelList.map(ch => <option key={ch.id} value={ch.id}>{ch.name} - {ch.frequency} ({ch.type})</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs uppercase text-gray-500 font-bold">Coordenador</label>
+                            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.coordinatorName} onChange={e => setSectorFormData({...sectorFormData, coordinatorName: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs uppercase text-gray-500 font-bold">WhatsApp</label>
+                            <input type="tel" placeholder="(00) 00000-0000" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.coordinatorPhone} onChange={e => setSectorFormData({...sectorFormData, coordinatorPhone: e.target.value})} />
+                        </div>
+                    </div>
+                )}
+                
+                {/* Outros cases mantidos conforme original... */}
                 {activeTab === 'events' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2 space-y-1">
@@ -222,23 +301,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                         <div className="space-y-1">
                             <label className="text-xs uppercase text-gray-500 font-bold">Nome do ITEM (Ex: Lanterna, Rádio)</label>
                             <input required type="text" placeholder="Digite o nome..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" value={itemFormData.name} onChange={e => setItemFormData({name: e.target.value})} />
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'sectors' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Sigla do Setor</label>
-                            <input required type="text" placeholder="Ex: ADM" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold uppercase" value={sectorFormData.name} onChange={e => setSectorFormData({...sectorFormData, name: e.target.value.toUpperCase()})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Coordenador</label>
-                            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.coordinatorName} onChange={e => setSectorFormData({...sectorFormData, coordinatorName: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">WhatsApp</label>
-                            <input type="tel" placeholder="(00) 00000-0000" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.coordinatorPhone} onChange={e => setSectorFormData({...sectorFormData, coordinatorPhone: e.target.value})} />
                         </div>
                     </div>
                 )}
@@ -324,6 +386,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                     )}
                                     {activeTab === 'inventory' && inventorySubTab === 'itens' && <span className="font-bold text-gray-900">{item.name}</span>}
                                     {activeTab === 'sectors' && <div className="font-black text-gray-900 tracking-tighter">{item.name}</div>}
+                                    {activeTab === 'channels' && <div className="font-black text-gray-900 font-mono">{item.name}</div>}
                                     {activeTab === 'users' && <div className="font-bold text-gray-900 text-sm">{item.name}</div>}
                                 </td>
                                 <td className="p-4 text-sm">
@@ -331,6 +394,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                     {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-xs text-gray-500 uppercase font-bold">{item.category} | {item.brand} {item.model}</div>}
                                     {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="text-gray-500 font-mono text-xs"><Clock size={12} className="inline mr-1"/> {formatDate(item.createdAt)}</div>}
                                     {activeTab === 'sectors' && <div className="text-xs text-gray-500">{item.coordinatorName || '-'}</div>}
+                                    {activeTab === 'channels' && <div className="text-xs font-bold text-brand-600">{item.frequency} MHz</div>}
                                     {activeTab === 'users' && <div className="text-xs font-black text-brand-600 uppercase">{item.role}</div>}
                                 </td>
                                 <td className="p-4">
@@ -346,7 +410,13 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                         </div>
                                     )}
                                     {activeTab === 'users' && <div className="text-xs text-gray-400 font-mono">{item.email}</div>}
-                                    {activeTab === 'sectors' && <div className="text-xs text-brand-600 font-bold">{item.coordinatorPhone || '-'}</div>}
+                                    {activeTab === 'channels' && <div className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{item.type}</div>}
+                                    {activeTab === 'sectors' && (
+                                        <div className="flex items-center gap-2">
+                                            <RadioIcon size={14} className="text-brand-500" />
+                                            <span className="text-xs text-brand-600 font-bold">{resolveChannelName(item.channelId)}</span>
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="p-4 text-right space-x-1">
                                     <button 
@@ -354,7 +424,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                             if (activeTab === 'events') setEventFormData({name: item.name, startDate: item.startDate, endDate: item.endDate, isActive: item.isActive});
                                             if (activeTab === 'inventory' && inventorySubTab === 'ativos') setEqFormData({inventoryNumber: item.inventoryNumber, brand: item.brand, model: item.model, category: item.category});
                                             if (activeTab === 'inventory' && inventorySubTab === 'itens') setItemFormData({name: item.name});
-                                            if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || ''});
+                                            if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || '', channelId: item.channelId || ''});
+                                            if (activeTab === 'channels') setChannelFormData({name: item.name, frequency: item.frequency, type: item.type});
                                             if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: ''});
                                             setEditingId(item.id);
                                             setIsAdding(true);
@@ -370,6 +441,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                                     else onDeleteItem(item.id);
                                                 }
                                                 if (activeTab === 'sectors') onDeleteSector(item.id);
+                                                if (activeTab === 'channels') onDeleteChannel(item.id);
                                                 if (activeTab === 'users') onDeleteUser(item.id);
                                             }
                                         }}

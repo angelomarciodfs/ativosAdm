@@ -1,8 +1,15 @@
 
 import { supabase } from './supabaseClient';
-import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, EquipmentItem } from '../types';
+import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, EquipmentItem, Channel } from '../types';
 
 // --- HELPERS DE CONVERSÃO ---
+
+const mapChannel = (c: any): Channel => ({
+  id: c.id,
+  name: c.name,
+  frequency: c.frequency,
+  type: c.type
+});
 
 const mapItem = (c: any): EquipmentItem => ({
   id: c.id,
@@ -25,7 +32,8 @@ const mapSector = (s: any): Sector => ({
   id: s.id,
   name: s.name,
   coordinatorName: s.coordinator_name,
-  coordinatorPhone: s.coordinator_phone
+  coordinatorPhone: s.coordinator_phone,
+  channelId: s.channel_id
 });
 
 const mapEvent = (e: any): Event => ({
@@ -52,7 +60,6 @@ const mapRental = (r: any): Rental => ({
   clientName: r.client_name,
   clientPhone: r.client_phone,
   clientCompany: r.client_company,
-  radioModel: r.radio_model,
   serialNumber: r.serial_number,
   startDate: r.start_date,
   expectedReturnDate: r.expected_return_date,
@@ -61,12 +68,38 @@ const mapRental = (r: any): Rental => ({
   notes: r.notes,
   registeredBy: r.registered_by,
   accessories: r.accessories, 
-  returnedAccessories: r.returned_accessories 
+  returnedAccessories: r.returned_accessories,
+  radioModel: r.radio_model
 });
 
 // --- API METHODS ---
 
 export const api = {
+  // CANAIS
+  fetchChannels: async () => {
+    const { data, error } = await supabase.from('channels').select('*').order('name');
+    if (error) throw error;
+    return (data || []).map(mapChannel);
+  },
+  createChannel: async (ch: Omit<Channel, 'id'>) => {
+    const { data, error } = await supabase.from('channels').insert(ch).select().single();
+    if (error) throw error;
+    return mapChannel(data);
+  },
+  updateChannel: async (ch: Channel) => {
+    const { data, error } = await supabase.from('channels').update({
+        name: ch.name,
+        frequency: ch.frequency,
+        type: ch.type
+    }).eq('id', ch.id).select().single();
+    if (error) throw error;
+    return mapChannel(data);
+  },
+  deleteChannel: async (id: string) => {
+    const { error } = await supabase.from('channels').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   fetchItems: async () => {
     try {
       const { data, error } = await supabase
@@ -95,23 +128,14 @@ export const api = {
     return mapItem(data);
   },
   updateItem: async (id: string, name: string) => {
-    // Removemos .single() para evitar erro se RLS bloquear o retorno
     const { data, error } = await supabase
       .from('equipment_categories')
       .update({ name })
       .eq('id', id)
       .select('id, name, created_at, created_by');
     
-    if (error) {
-      console.error("Erro no updateItem:", error);
-      throw error;
-    }
-    
-    if (!data || data.length === 0) {
-      throw new Error("Não foi possível atualizar o item. Verifique suas permissões.");
-    }
-
-    return mapItem(data[0]);
+    if (error) throw error;
+    return mapItem(data![0]);
   },
   deleteItem: async (id: string) => {
     const { error } = await supabase.from('equipment_categories').delete().eq('id', id);
@@ -186,7 +210,8 @@ export const api = {
     const { data, error } = await supabase.from('sectors').insert({
         name: sec.name,
         coordinator_name: sec.coordinatorName,
-        coordinator_phone: sec.coordinatorPhone
+        coordinator_phone: sec.coordinatorPhone,
+        channel_id: sec.channelId
     }).select().single();
     if (error) throw error;
     return mapSector(data);
@@ -195,7 +220,8 @@ export const api = {
     const { data, error } = await supabase.from('sectors').update({
         name: sec.name,
         coordinator_name: sec.coordinatorName,
-        coordinator_phone: sec.coordinatorPhone
+        coordinator_phone: sec.coordinatorPhone,
+        channel_id: sec.channelId
     }).eq('id', sec.id).select().single();
     if (error) throw error;
     return mapSector(data);
