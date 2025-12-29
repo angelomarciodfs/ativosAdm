@@ -313,7 +313,16 @@ const App: React.FC = () => {
             onUpdateEquipment={async (d) => { await api.updateEquipment(d); fetchData(); }} 
             onDeleteEquipment={async (id) => { await api.deleteEquipment(id); fetchData(); }}
             itemList={items} 
-            onAddItem={async (n) => { await api.createItem(n); fetchData(); }} 
+            onAddItem={async (n) => { 
+                if (currentUser) {
+                  try {
+                    await api.createItem(n, currentUser.id); 
+                    await fetchData(); 
+                  } catch (e) {
+                    alert("Erro ao criar item. Verifique se as políticas de RLS estão aplicadas no banco.");
+                  }
+                }
+            }} 
             onUpdateItem={async (id, n) => { await api.updateItem(id, n); fetchData(); }} 
             onDeleteItem={async (id) => { await api.deleteItem(id); fetchData(); }}
             sectorList={sectors} 

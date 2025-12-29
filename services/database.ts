@@ -9,7 +9,7 @@ const mapItem = (c: any): EquipmentItem => {
     id: c.id,
     name: c.name,
     createdAt: c.created_at,
-    createdBy: c.created_by || 'Sistema' // Fallback caso a coluna venha a existir
+    createdBy: c.created_by // Agora mapeia o ID do criador (texto ou uuid)
   };
 };
 
@@ -27,6 +27,7 @@ const mapSector = (s: any): Sector => ({
   id: s.id,
   name: s.name,
   coordinatorName: s.coordinator_name,
+  // Fix: changed coordinator_phone to coordinatorPhone to match Sector interface
   coordinatorPhone: s.coordinator_phone
 });
 
@@ -54,6 +55,7 @@ const mapRental = (r: any): Rental => ({
   clientName: r.client_name,
   clientPhone: r.client_phone,
   clientCompany: r.client_company,
+  // Fix: changed property names from snake_case to camelCase to match Rental interface
   radioModel: r.radio_model,
   serialNumber: r.serial_number,
   startDate: r.start_date,
@@ -72,10 +74,10 @@ export const api = {
   // ITEMS (EQUIPMENT CATEGORIES)
   fetchItems: async () => {
     try {
-      // Busca apenas colunas garantidas: id, name, created_at
+      // Buscamos todas as colunas necessárias. Se RLS estiver OK, os dados aparecerão.
       const { data, error } = await supabase
         .from('equipment_categories')
-        .select('id, name, created_at')
+        .select('id, name, created_at, created_by')
         .order('name');
       
       if (error) throw error;
@@ -85,14 +87,14 @@ export const api = {
       return [];
     }
   },
-  createItem: async (name: string) => {
-    // Removido created_by do insert para evitar erro PGRST204
+  createItem: async (name: string, userId: string) => {
     const { data, error } = await supabase
       .from('equipment_categories')
       .insert({ 
-        name: name
+        name: name,
+        created_by: userId
       })
-      .select('id, name, created_at')
+      .select('id, name, created_at, created_by')
       .single();
       
     if (error) {
@@ -106,7 +108,7 @@ export const api = {
       .from('equipment_categories')
       .update({ name })
       .eq('id', id)
-      .select('id, name, created_at')
+      .select('id, name, created_at, created_by')
       .single();
     if (error) throw error;
     return mapItem(data);
