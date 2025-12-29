@@ -1,11 +1,10 @@
 
 import { supabase } from './supabaseClient';
-import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, Category } from '../types';
+import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, EquipmentItem } from '../types';
 
 // --- HELPERS DE CONVERSÃO ---
 
-const mapCategory = (c: any): Category => {
-  // Supabase pode retornar profiles como objeto ou array dependendo da config da FK
+const mapItem = (c: any): EquipmentItem => {
   const profileData = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
   return {
     id: c.id,
@@ -71,25 +70,25 @@ const mapRental = (r: any): Rental => ({
 // --- API METHODS ---
 
 export const api = {
-  // CATEGORIES
-  fetchCategories: async () => {
+  // ITEMS (EQUIPMENT CATEGORIES)
+  fetchItems: async () => {
     const { data, error } = await supabase
       .from('equipment_categories')
       .select('*, profiles(name)')
       .order('name');
     if (error) throw error;
-    return (data || []).map(mapCategory);
+    return (data || []).map(mapItem);
   },
-  createCategory: async (name: string, userId: string) => {
+  createItem: async (name: string, userId: string) => {
     const { data, error } = await supabase
       .from('equipment_categories')
       .insert({ name, created_by: userId })
       .select('*, profiles(name)')
       .single();
     if (error) throw error;
-    return mapCategory(data);
+    return mapItem(data);
   },
-  updateCategory: async (id: string, name: string) => {
+  updateItem: async (id: string, name: string) => {
     const { data, error } = await supabase
       .from('equipment_categories')
       .update({ name })
@@ -97,9 +96,9 @@ export const api = {
       .select('*, profiles(name)')
       .single();
     if (error) throw error;
-    return mapCategory(data);
+    return mapItem(data);
   },
-  deleteCategory: async (id: string) => {
+  deleteItem: async (id: string) => {
     const { error } = await supabase.from('equipment_categories').delete().eq('id', id);
     if (error) throw error;
   },

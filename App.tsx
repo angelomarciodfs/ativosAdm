@@ -8,24 +8,24 @@ import { ConfigurationView } from './components/ConfigurationView';
 import { ReportView } from './components/ReportView';
 import { LoginScreen } from './components/LoginScreen';
 import { SYSTEM_LOGO } from './constants';
-import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories, Category } from './types';
+import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories, EquipmentItem } from './types';
 import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, Menu, CheckCircle, Loader, X, Lock, Save, User as UserIcon, KeyRound, Tags, Lightbulb } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { supabase, isConfigured, supabaseUrl, supabaseKey } from './services/supabaseClient';
 import { api } from './services/database';
 import { createClient } from '@supabase/supabase-js';
 
-const InventoryStatusChart = ({ equipment, rentals, currentEvent, categories }: { equipment: Equipment[], rentals: Rental[], currentEvent: Event | null, categories: Category[] }) => {
+const InventoryStatusChart = ({ equipment, rentals, currentEvent, items }: { equipment: Equipment[], rentals: Rental[], currentEvent: Event | null, items: EquipmentItem[] }) => {
   const activeRentals = rentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
 
-  const getStats = (categoryName: string) => {
-      const totalInventory = equipment.filter(e => e.category === categoryName).length;
+  const getStats = (itemName: string) => {
+      const totalInventory = equipment.filter(e => e.category === itemName).length;
       let totalRented = 0;
       
-      if (categoryName === 'Radio') {
+      if (itemName === 'Radio') {
           totalRented = activeRentals.length; 
       } else {
-          totalRented = activeRentals.filter(r => r.radioModel.includes(categoryName)).length;
+          totalRented = activeRentals.filter(r => r.radioModel.includes(itemName)).length;
       }
       
       const available = Math.max(0, totalInventory - totalRented);
@@ -44,15 +44,15 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, categories }: 
 
   return (
     <div className="flex flex-col justify-center h-full gap-5 px-2">
-       {categories.length > 0 ? categories.slice(0, 4).map((cat) => {
-           const stats = getStats(cat.name);
-           const Icon = getIcon(cat.name);
+       {items.length > 0 ? items.slice(0, 4).map((item) => {
+           const stats = getStats(item.name);
+           const Icon = getIcon(item.name);
            return (
-               <div key={cat.id} className="space-y-2">
+               <div key={item.id} className="space-y-2">
                    <div className="flex justify-between items-end">
                        <div className="flex items-center gap-2 text-gray-700">
                            <Icon size={16} className="text-brand-600" />
-                           <span className="font-bold text-sm">{cat.name}</span>
+                           <span className="font-bold text-sm">{item.name}</span>
                        </div>
                        <div className="text-xs text-gray-500 font-mono">
                            <span className="text-brand-600 font-bold">{stats.totalRented}</span> em uso / <span className="text-gray-900">{stats.available}</span> disp.
@@ -73,7 +73,7 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, categories }: 
                </div>
            );
        }) : (
-           <div className="text-center text-gray-400 text-sm py-10">Cadastre Itens para ver métricas.</div>
+           <div className="text-center text-gray-400 text-sm py-10">Nenhum ITEM cadastrado.</div>
        )}
     </div>
   );
@@ -167,7 +167,7 @@ const App: React.FC = () => {
   // Data States
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [items, setItems] = useState<EquipmentItem[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -212,20 +212,20 @@ const App: React.FC = () => {
               } 
           };
 
-          const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedCats] = await Promise.all([
+          const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedItems] = await Promise.all([
               loadSafe(api.fetchEvents(), []),
               loadSafe(api.fetchEquipment(), []),
               loadSafe(api.fetchSectors(), []),
               loadSafe(api.fetchRentals(), []),
               loadSafe(api.fetchUsers(), []),
-              loadSafe(api.fetchCategories(), [])
+              loadSafe(api.fetchItems(), [])
           ]);
 
           setEvents(loadedEvents);
           setEquipmentList(loadedEq);
           setSectors(loadedSectors);
           setRentals(loadedRentals);
-          setCategories(loadedCats);
+          setItems(loadedItems);
           setUsers(loadedUsers);
           
           const active = loadedEvents.find(e => e.isActive) || (loadedEvents.length > 0 ? loadedEvents[0] : null);
@@ -293,7 +293,7 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
                 <h3 className="text-[11px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2 tracking-widest"><Zap size={14} className="text-brand-600" /> Inventário por ITEM</h3>
-                <div className="flex-1 mt-2"><InventoryStatusChart equipment={equipmentList} rentals={eventRentals} currentEvent={currentEvent} categories={categories} /></div>
+                <div className="flex-1 mt-2"><InventoryStatusChart equipment={equipmentList} rentals={eventRentals} currentEvent={currentEvent} items={items} /></div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
                  <h3 className="text-[11px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2 tracking-widest"><PieChart size={14} className="text-brand-600" /> Alocação por Setor</h3>
@@ -312,10 +312,10 @@ const App: React.FC = () => {
             onAddEquipment={async (d) => { await api.createEquipment(d); fetchData(); }} 
             onUpdateEquipment={async (d) => { await api.updateEquipment(d); fetchData(); }} 
             onDeleteEquipment={async (id) => { await api.deleteEquipment(id); fetchData(); }}
-            categoryList={categories} 
-            onAddCategory={async (n) => { if(currentUser) await api.createCategory(n, currentUser.id); fetchData(); }} 
-            onUpdateCategory={async (id, n) => { await api.updateCategory(id, n); fetchData(); }} 
-            onDeleteCategory={async (id) => { await api.deleteCategory(id); fetchData(); }}
+            itemList={items} 
+            onAddItem={async (n) => { if(currentUser) await api.createItem(n, currentUser.id); fetchData(); }} 
+            onUpdateItem={async (id, n) => { await api.updateItem(id, n); fetchData(); }} 
+            onDeleteItem={async (id) => { await api.deleteItem(id); fetchData(); }}
             sectorList={sectors} 
             onAddSector={async (d) => { await api.createSector(d); fetchData(); }} 
             onUpdateSector={async (d) => { await api.updateSector(d); fetchData(); }} 

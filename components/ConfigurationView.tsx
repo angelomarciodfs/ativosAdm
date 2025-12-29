@@ -1,17 +1,17 @@
 
 import React, { useState } from 'react';
-import { Equipment, Sector, User, UserRole, Event, Category } from '../types';
-import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Tags, ChevronRight, Clock, UserCheck } from 'lucide-react';
+import { Equipment, Sector, User, UserRole, Event, EquipmentItem } from '../types';
+import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Tags, ChevronRight, Clock, UserCheck, AlertCircle } from 'lucide-react';
 
 interface ConfigurationViewProps {
   equipmentList: Equipment[];
   onAddEquipment: (equipment: Omit<Equipment, 'id'>) => void;
   onUpdateEquipment: (equipment: Equipment) => void;
   onDeleteEquipment: (id: string) => void;
-  categoryList: Category[];
-  onAddCategory: (name: string) => void;
-  onUpdateCategory: (id: string, name: string) => void;
-  onDeleteCategory: (id: string) => void;
+  itemList: EquipmentItem[];
+  onAddItem: (name: string) => void;
+  onUpdateItem: (id: string, name: string) => void;
+  onDeleteItem: (id: string) => void;
   sectorList: Sector[];
   onAddSector: (sector: Omit<Sector, 'id'>) => void;
   onUpdateSector: (sector: Sector) => void;
@@ -28,7 +28,7 @@ interface ConfigurationViewProps {
 
 export const ConfigurationView: React.FC<ConfigurationViewProps> = ({ 
   equipmentList, onAddEquipment, onUpdateEquipment, onDeleteEquipment,
-  categoryList, onAddCategory, onUpdateCategory, onDeleteCategory,
+  itemList, onAddItem, onUpdateItem, onDeleteItem,
   sectorList, onAddSector, onUpdateSector, onDeleteSector,
   userList, onAddUser, onUpdateUser, onDeleteUser,
   eventList, onAddEvent, onUpdateEvent, onDeleteEvent,
@@ -41,14 +41,14 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   
   // Form States
   const [eqFormData, setEqFormData] = useState({ inventoryNumber: '', name: '', brand: '', model: '', category: '' });
-  const [catFormData, setCatFormData] = useState({ name: '' });
+  const [itemFormData, setItemFormData] = useState({ name: '' });
   const [sectorFormData, setSectorFormData] = useState({ name: '', coordinatorName: '', coordinatorPhone: '' });
   const [userFormData, setUserFormData] = useState({ name: '', preferredName: '', email: '', phone: '', role: 'USER' as UserRole, password: '' });
   const [eventFormData, setEventFormData] = useState({ name: '', startDate: '', endDate: '', isActive: true });
 
   const resetForms = () => {
     setEqFormData({ inventoryNumber: '', name: '', brand: '', model: '', category: '' });
-    setCatFormData({ name: '' });
+    setItemFormData({ name: '' });
     setSectorFormData({ name: '', coordinatorName: '', coordinatorPhone: '' });
     setUserFormData({ name: '', preferredName: '', email: '', phone: '', role: 'USER', password: '' });
     setEventFormData({ name: '', startDate: '', endDate: '', isActive: true });
@@ -59,8 +59,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (activeTab === 'inventory' && inventorySubTab === 'itens') {
-        if (editingId) onUpdateCategory(editingId, catFormData.name);
-        else onAddCategory(catFormData.name);
+        if (editingId) onUpdateItem(editingId, itemFormData.name);
+        else onAddItem(itemFormData.name);
     } else if (activeTab === 'inventory' && inventorySubTab === 'ativos') {
         if (editingId) {
             const original = equipmentList.find(item => item.id === editingId);
@@ -88,7 +88,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     if (activeTab === 'users') return userList.filter(u => u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term));
     if (activeTab === 'inventory') {
         if (inventorySubTab === 'ativos') return equipmentList.filter(eq => eq.inventoryNumber.toLowerCase().includes(term) || eq.name.toLowerCase().includes(term));
-        return categoryList.filter(c => c.name.toLowerCase().includes(term));
+        return itemList.filter(c => c.name.toLowerCase().includes(term));
     }
     return [];
   };
@@ -103,7 +103,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Configurações</h2>
-          <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Gestão centralizada de recursos.</p>
+          <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Controle central de ativos e acessos.</p>
         </div>
         <button 
           onClick={() => { setIsAdding(!isAdding); if(isAdding) resetForms(); }}
@@ -115,7 +115,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
         </button>
       </div>
 
-      {/* TABS PRINCIPAIS */}
+      {/* TABS NAVEGAÇÃO */}
       <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar bg-white rounded-t-xl px-2">
         {[
             { id: 'events', label: 'Eventos', icon: Calendar },
@@ -135,7 +135,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
         ))}
       </div>
 
-      {/* SUB-TABS PARA INVENTÁRIO */}
+      {/* SUB-TABS INVENTÁRIO */}
       {activeTab === 'inventory' && (
           <div className="flex gap-2 p-1.5 bg-gray-100 rounded-lg w-fit shadow-inner">
               <button 
@@ -153,10 +153,10 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           </div>
       )}
 
-      {/* FORMULÁRIO DE CADASTRO */}
+      {/* FORMULÁRIO */}
       {isAdding && (
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-2xl animate-in slide-in-from-top-4 duration-300">
-            <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-100 pb-3">
+            <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-100 pb-3 uppercase tracking-tighter">
                 <Plus size={20} className="text-brand-500" /> 
                 {editingId ? 'Editar' : 'Novo'} {activeTab === 'inventory' ? (inventorySubTab === 'ativos' ? 'Ativo' : 'ITEM') : activeTab.slice(0, -1).toUpperCase()}
             </h3>
@@ -176,7 +176,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                             <label className="text-xs uppercase text-gray-500 font-bold">Data Fim</label>
                             <input required type="date" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eventFormData.endDate} onChange={e => setEventFormData({...eventFormData, endDate: e.target.value})} />
                         </div>
-                        <div className="flex items-center gap-2 pt-2">
+                        <div className="flex items-center gap-2 py-2">
                             <input type="checkbox" id="isActive" checked={eventFormData.isActive} onChange={e => setEventFormData({...eventFormData, isActive: e.target.checked})} className="w-5 h-5 accent-brand-500 rounded" />
                             <label htmlFor="isActive" className="text-sm font-bold text-gray-700">Evento Ativo Atualmente</label>
                         </div>
@@ -186,21 +186,21 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                 {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold flex justify-between items-center">
-                                ITEM (Tipo)
-                                <button type="button" onClick={() => { setInventorySubTab('itens'); setIsAdding(true); setEditingId(null); }} className="text-brand-600 hover:underline text-[10px] font-black">ADICIONAR NOVO ITEM +</button>
+                            <label className="text-xs uppercase text-gray-500 font-bold flex justify-between items-center mb-1">
+                                ITEM (Tipo de Ativo)
+                                <button type="button" onClick={() => { setInventorySubTab('itens'); setIsAdding(true); setEditingId(null); }} className="text-brand-600 hover:text-brand-700 text-[9px] font-black border border-brand-200 px-1.5 rounded bg-brand-50">CADASTRAR NOVO ITEM +</button>
                             </label>
                             <select required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.category} onChange={e => setEqFormData({...eqFormData, category: e.target.value})}>
                                 <option value="">Selecione...</option>
-                                {categoryList.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                {itemList.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs uppercase text-brand-600 font-bold">Tag Patrimônio</label>
+                            <label className="text-xs uppercase text-brand-600 font-bold">Patrimônio / ID</label>
                             <input required type="text" placeholder="Ex: R-01" className="w-full bg-gray-50 border border-brand-200 rounded-lg p-3 font-mono font-bold" value={eqFormData.inventoryNumber} onChange={e => setEqFormData({...eqFormData, inventoryNumber: e.target.value.toUpperCase()})} />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Nome Identificador</label>
+                            <label className="text-xs uppercase text-gray-500 font-bold">Nome / Descrição</label>
                             <input required type="text" placeholder="Ex: Rádio Coordenação" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.name} onChange={e => setEqFormData({...eqFormData, name: e.target.value})} />
                         </div>
                         <div className="space-y-1">
@@ -217,8 +217,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                 {activeTab === 'inventory' && inventorySubTab === 'itens' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do ITEM (Ex: Lanterna, Rádio)</label>
-                            <input required type="text" placeholder="Digite o nome..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" value={catFormData.name} onChange={e => setCatFormData({name: e.target.value})} />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do ITEM (Ex: Lanterna de Cabeça)</label>
+                            <input required type="text" placeholder="Digite o nome..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" value={itemFormData.name} onChange={e => setItemFormData({name: e.target.value})} />
                         </div>
                     </div>
                 )}
@@ -276,18 +276,18 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           </div>
       )}
 
-      {/* LISTAGEM DE REGISTROS */}
+      {/* LISTAGEM */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-             <h3 className="text-lg font-black text-gray-900 tracking-tight">Listagem</h3>
+             <h3 className="text-lg font-black text-gray-900 tracking-tight">Listagem Sincronizada</h3>
              <span className="bg-gray-100 text-[10px] font-black text-gray-500 px-2 py-0.5 rounded-full border border-gray-200 uppercase tracking-tighter">
                 {filteredData().length} Total
              </span>
           </div>
           <div className="relative w-full md:w-auto">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-            <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm w-full md:w-64 focus:ring-1 focus:ring-brand-500 focus:outline-none" />
+            <input type="text" placeholder="Filtrar nesta lista..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm w-full md:w-64 focus:ring-1 focus:ring-brand-500 focus:outline-none" />
           </div>
         </div>
 
@@ -299,7 +299,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                             {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : 'Identificação Principal'}
                         </th>
                         <th className="p-4">
-                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : 'Detalhes / Datas'}
+                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : 'Datas / Info'}
                         </th>
                         <th className="p-4">
                             {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado por' : 'Status / Vínculo'}
@@ -309,7 +309,12 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                     {filteredData().length === 0 ? (
-                        <tr><td colSpan={4} className="p-16 text-center text-gray-400 italic font-medium">Nenhum registro encontrado.</td></tr>
+                        <tr><td colSpan={4} className="p-16 text-center text-gray-400 italic font-medium">
+                            <div className="flex flex-col items-center gap-2">
+                                <AlertCircle size={32} className="text-gray-200" />
+                                <span>Nenhum registro encontrado.</span>
+                            </div>
+                        </td></tr>
                     ) : (
                         filteredData().map((item: any) => (
                             <tr key={item.id} className="hover:bg-brand-50/20 transition-colors group">
@@ -327,7 +332,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                             <span className="font-bold text-gray-900">{item.name}</span>
                                         </div>
                                     )}
-                                    {activeTab === 'sectors' && <div className="font-black text-gray-900">{item.name}</div>}
+                                    {activeTab === 'sectors' && <div className="font-black text-gray-900 tracking-tighter">{item.name}</div>}
                                     {activeTab === 'users' && (
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-[10px] font-black text-brand-700">{item.avatarInitials}</div>
@@ -366,7 +371,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                         onClick={() => {
                                             if (activeTab === 'events') setEventFormData({name: item.name, startDate: item.startDate, endDate: item.endDate, isActive: item.isActive});
                                             if (activeTab === 'inventory' && inventorySubTab === 'ativos') setEqFormData({inventoryNumber: item.inventoryNumber, name: item.name, brand: item.brand, model: item.model, category: item.category});
-                                            if (activeTab === 'inventory' && inventorySubTab === 'itens') setCatFormData({name: item.name});
+                                            if (activeTab === 'inventory' && inventorySubTab === 'itens') setItemFormData({name: item.name});
                                             if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || ''});
                                             if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: ''});
                                             
@@ -383,7 +388,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                                 if (activeTab === 'events') onDeleteEvent(item.id);
                                                 if (activeTab === 'inventory') {
                                                     if (inventorySubTab === 'ativos') onDeleteEquipment(item.id);
-                                                    else onDeleteCategory(item.id);
+                                                    else onDeleteItem(item.id);
                                                 }
                                                 if (activeTab === 'sectors') onDeleteSector(item.id);
                                                 if (activeTab === 'users') onDeleteUser(item.id);

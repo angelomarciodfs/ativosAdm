@@ -7,11 +7,11 @@ export enum RentalStatus {
   PARTIAL = 'Parcial / Pendente'
 }
 
-export interface Category {
+export interface EquipmentItem {
   id: string;
   name: string;
   createdAt?: string;
-  createdBy?: string; // Nome do usuário que criou
+  createdBy?: string;
 }
 
 export interface Equipment {
