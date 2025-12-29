@@ -145,16 +145,16 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
       </div>
 
       {activeTab === 'inventory' && (
-          <div className="flex gap-2 p-1.5 bg-gray-100 rounded-lg w-fit shadow-inner">
+          <div className="flex gap-2 p-1.5 bg-gray-100 rounded-lg w-full md:w-fit shadow-inner justify-center md:justify-start">
               <button 
                 onClick={() => { setInventorySubTab('ativos'); if(isAdding) resetForms(); }}
-                className={`px-5 py-2 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'ativos' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 md:flex-none px-5 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'ativos' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 Ativos Físicos
               </button>
               <button 
                 onClick={() => { setInventorySubTab('itens'); if(isAdding) resetForms(); }}
-                className={`px-5 py-2 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'itens' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 md:flex-none px-5 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'itens' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 Gerenciar ITENS
               </button>
