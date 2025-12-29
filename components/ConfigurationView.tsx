@@ -98,6 +98,14 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
       return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
+  // Helper para resolver o nome do criador
+  const resolveCreatorName = (userIdOrName?: string) => {
+      if (!userIdOrName) return 'Sistema';
+      // Se for um UUID, tenta encontrar na lista de usuários
+      const user = userList.find(u => u.id === userIdOrName);
+      return user ? user.name : userIdOrName; // Retorna o nome ou o que estiver no campo
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -360,7 +368,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                     {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-[10px] text-gray-400 italic">Cad. em {formatDate(item.createdAt)}</div>}
                                     {activeTab === 'inventory' && inventorySubTab === 'itens' && (
                                         <div className="flex items-center gap-2 text-gray-700 font-bold text-xs uppercase">
-                                            <UserCheck size={14} className="text-brand-500" /> {item.createdBy || 'Sistema'}
+                                            <UserCheck size={14} className="text-brand-500" /> {resolveCreatorName(item.createdBy)}
                                         </div>
                                     )}
                                     {activeTab === 'users' && <div className="text-xs text-gray-400 font-mono">{item.email}</div>}

@@ -5,13 +5,11 @@ import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, Equipme
 // --- HELPERS DE CONVERSÃO ---
 
 const mapItem = (c: any): EquipmentItem => {
-  // Tenta extrair o nome do perfil, lidando com diferentes formatos de retorno do Supabase
-  const profileData = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
   return {
     id: c.id,
     name: c.name,
     createdAt: c.created_at,
-    createdBy: profileData?.name || 'Sistema'
+    createdBy: c.created_by // Retorna o ID (UUID) do criador
   };
 };
 
@@ -59,10 +57,13 @@ const mapRental = (r: any): Rental => ({
   radioModel: r.radio_model,
   serialNumber: r.serial_number,
   startDate: r.start_date,
+  // Fix: changed expected_return_date to expectedReturnDate to match Rental interface
   expectedReturnDate: r.expected_return_date,
+  // Fix: changed actual_return_date to actualReturnDate to match Rental interface
   actualReturnDate: r.actual_return_date,
   status: r.status as RentalStatus,
   notes: r.notes,
+  // Fix: changed registered_by to registeredBy to match Rental interface
   registeredBy: r.registered_by,
   accessories: r.accessories, 
   returnedAccessories: r.returned_accessories 
@@ -74,21 +75,13 @@ export const api = {
   // ITEMS (EQUIPMENT CATEGORIES)
   fetchItems: async () => {
     try {
+      // Busca simples sem Join para evitar erro PGRST200
       const { data, error } = await supabase
         .from('equipment_categories')
-        .select(`
-          id, 
-          name, 
-          created_at, 
-          created_by,
-          profiles (name)
-        `)
+        .select('*')
         .order('name');
       
-      if (error) {
-        console.error("Erro ao buscar itens do inventário:", error);
-        throw error;
-      }
+      if (error) throw error;
       return (data || []).map(mapItem);
     } catch (err) {
       console.error("Falha na API fetchItems:", err);
@@ -102,7 +95,7 @@ export const api = {
         name: name, 
         created_by: userId 
       })
-      .select('*, profiles(name)')
+      .select('*')
       .single();
       
     if (error) {
@@ -116,7 +109,7 @@ export const api = {
       .from('equipment_categories')
       .update({ name })
       .eq('id', id)
-      .select('*, profiles(name)')
+      .select('*')
       .single();
     if (error) throw error;
     return mapItem(data);
@@ -161,7 +154,7 @@ export const api = {
   },
   createEquipment: async (eq: Omit<Equipment, 'id'>) => {
     const { data, error } = await supabase.from('equipment').insert({
-        inventory_number: eq.inventoryNumber,
+        inventory_number: eq.inventory_number,
         name: eq.name,
         brand: eq.brand,
         model: eq.model,
@@ -261,6 +254,7 @@ export const api = {
           radio_model: rental.radioModel,
           serial_number: rental.serialNumber,
           start_date: rental.startDate,
+          // Fix: changed expected_return_date access to expectedReturnDate to match Rental interface
           expected_return_date: rental.expectedReturnDate,
           status: 'Ativo',
           notes: rental.notes,
