@@ -25,7 +25,8 @@ const mapUser = (u: any): User => ({
   role: u.role as UserRole,
   avatarInitials: u.avatar_initials || u.name.substring(0, 2).toUpperCase(),
   preferredName: u.preferred_name,
-  phone: u.phone
+  phone: u.phone,
+  isActive: u.is_active !== false // Default true se for nulo
 });
 
 const mapSector = (s: any): Sector => ({
@@ -211,7 +212,6 @@ export const api = {
         name: sec.name,
         coordinator_name: sec.coordinatorName,
         coordinator_phone: sec.coordinatorPhone,
-        // Converte string vazia para null para evitar erro de UUID inválido
         channel_id: sec.channelId || null 
     }).select().single();
     if (error) throw error;
@@ -222,7 +222,6 @@ export const api = {
         name: sec.name,
         coordinator_name: sec.coordinatorName,
         coordinator_phone: sec.coordinatorPhone,
-        // Converte string vazia para null para evitar erro de UUID inválido
         channel_id: sec.channelId || null
     }).eq('id', sec.id).select().single();
     if (error) throw error;
@@ -246,7 +245,8 @@ export const api = {
           role: user.role,
           avatar_initials: user.avatarInitials,
           phone: user.phone,
-          preferred_name: user.preferredName
+          preferred_name: user.preferredName,
+          is_active: user.isActive
       }).select().single();
       if (error) throw error;
       return mapUser(data);
@@ -256,7 +256,8 @@ export const api = {
           name: user.name,
           role: user.role,
           phone: user.phone,
-          preferred_name: user.preferredName
+          preferred_name: user.preferredName,
+          is_active: user.isActive
       }).eq('id', user.id).select().single();
       if (error) throw error;
       return mapUser(data);

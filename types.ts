@@ -93,4 +93,5 @@ export interface User {
   phone?: string; 
   role: UserRole;
   avatarInitials: string;
+  isActive: boolean;
 }

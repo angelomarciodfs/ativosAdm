@@ -141,7 +141,8 @@ const App: React.FC = () => {
                 name: session.user.email?.split('@')[0] || 'Admin', 
                 email: session.user.email || '', 
                 role: isFirstUser ? 'ADMIN' : 'USER', 
-                avatarInitials: (session.user.email || 'AD').substring(0,2).toUpperCase() 
+                avatarInitials: (session.user.email || 'AD').substring(0,2).toUpperCase(),
+                isActive: true
              };
              try { 
                 profile = await api.createProfile(recoveryProfile); 
@@ -150,7 +151,14 @@ const App: React.FC = () => {
                 profile = { ...recoveryProfile, role: isFirstUser ? 'ADMIN' : 'USER' }; 
              }
          }
-         setCurrentUser(profile);
+         
+         if (profile && !profile.isActive) {
+             alert("Sua conta está desativada. Entre em contato com o administrador.");
+             await supabase.auth.signOut();
+             setCurrentUser(null);
+         } else {
+             setCurrentUser(profile || null);
+         }
      } catch (e) { 
          console.error("Error profile", e); 
      } finally {
@@ -294,7 +302,7 @@ const App: React.FC = () => {
             onAddUser={async (d) => { 
                 const tempClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
                 const { data } = await tempClient.auth.signUp({ email: d.email, password: d.password! });
-                if (data.user) await api.createProfile({ id: data.user.id, name: d.name, email: d.email, role: d.role, avatarInitials: d.name.substring(0,2).toUpperCase() });
+                if (data.user) await api.createProfile({ id: data.user.id, name: d.name, email: d.email, role: d.role, avatarInitials: d.name.substring(0,2).toUpperCase(), isActive: d.isActive });
                 fetchData();
             }} 
             onUpdateUser={async (d) => { 

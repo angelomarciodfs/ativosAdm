@@ -52,7 +52,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   const [itemFormData, setItemFormData] = useState({ name: '' });
   const [sectorFormData, setSectorFormData] = useState({ name: '', coordinatorName: '', coordinatorPhone: '', channelId: '' });
   const [channelFormData, setChannelFormData] = useState({ name: '', frequency: '', type: 'VHF' });
-  const [userFormData, setUserFormData] = useState({ name: '', preferredName: '', email: '', phone: '', role: 'USER' as UserRole, password: '' });
+  const [userFormData, setUserFormData] = useState({ name: '', preferredName: '', email: '', phone: '', role: 'USER' as UserRole, password: '', isActive: true });
   const [eventFormData, setEventFormData] = useState({ name: '', startDate: '', endDate: '', isActive: true });
 
   const maskChannel = (val: string) => {
@@ -77,7 +77,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     setItemFormData({ name: '' });
     setSectorFormData({ name: '', coordinatorName: '', coordinatorPhone: '', channelId: '' });
     setChannelFormData({ name: '', frequency: '', type: 'VHF' });
-    setUserFormData({ name: '', preferredName: '', email: '', phone: '', role: 'USER', password: '' });
+    setUserFormData({ name: '', preferredName: '', email: '', phone: '', role: 'USER', password: '', isActive: true });
     setEventFormData({ name: '', startDate: '', endDate: '', isActive: true });
     setIsAdding(false);
     setEditingId(null);
@@ -335,6 +335,10 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                 <option value="ADMIN">Administrador (Total)</option>
                             </select>
                         </div>
+                        <div className="md:col-span-2 flex items-center gap-2 py-2">
+                            <input type="checkbox" id="userIsActive" checked={userFormData.isActive} onChange={e => setUserFormData({...userFormData, isActive: e.target.checked})} className="w-5 h-5 accent-brand-500 rounded" />
+                            <label htmlFor="userIsActive" className="text-sm font-bold text-gray-700">Usuário Ativo (Acesso Liberado)</label>
+                        </div>
                     </div>
                 )}
 
@@ -420,7 +424,11 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                                 <UserCheck size={14} className="text-brand-500" /> {resolveCreatorName(item.createdBy)}
                                             </div>
                                         )}
-                                        {activeTab === 'users' && <div className="text-xs text-gray-400 font-mono">{item.email}</div>}
+                                        {activeTab === 'users' && (
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                                                {item.isActive ? 'Ativo' : 'Inativo'}
+                                            </span>
+                                        )}
                                         {activeTab === 'channels' && <div className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{item.type}</div>}
                                         {activeTab === 'sectors' && (
                                             channelInfo ? (
@@ -444,7 +452,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                                 if (activeTab === 'inventory' && inventorySubTab === 'itens') setItemFormData({name: item.name});
                                                 if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || '', channelId: item.channelId || ''});
                                                 if (activeTab === 'channels') setChannelFormData({name: item.name, frequency: item.frequency, type: item.type});
-                                                if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: ''});
+                                                if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: '', isActive: item.isActive});
                                                 setEditingId(item.id);
                                                 setIsAdding(true);
                                             }}

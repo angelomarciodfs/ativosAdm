@@ -11,7 +11,9 @@ export const MOCK_USERS: User[] = [
     email: 'admin@radiotrack.com',
     phone: '(11) 99999-9999',
     role: 'ADMIN',
-    avatarInitials: 'JD'
+    avatarInitials: 'JD',
+    // Adicionando isActive para resolver erro de tipagem
+    isActive: true
   },
   {
     id: 'USR-002',
@@ -20,7 +22,9 @@ export const MOCK_USERS: User[] = [
     email: 'operacao@radiotrack.com',
     phone: '(11) 98888-8888',
     role: 'USER',
-    avatarInitials: 'OL'
+    avatarInitials: 'OL',
+    // Adicionando isActive para resolver erro de tipagem
+    isActive: true
   }
 ];
 
