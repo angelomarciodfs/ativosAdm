@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Equipment, Sector, User, UserRole, Event, EquipmentItem } from '../types';
-import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Tags, ChevronRight, Clock, UserCheck, AlertCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Tags, Clock, UserCheck, AlertCircle } from 'lucide-react';
 
 interface ConfigurationViewProps {
   equipmentList: Equipment[];
@@ -24,6 +24,11 @@ interface ConfigurationViewProps {
   onAddEvent: (event: Omit<Event, 'id'>) => void;
   onUpdateEvent: (event: Event) => void;
   onDeleteEvent: (id: string) => void;
+  // Novas props para controle externo do estado
+  activeTab: 'events' | 'inventory' | 'sectors' | 'users';
+  setActiveTab: (tab: any) => void;
+  inventorySubTab: 'ativos' | 'itens';
+  setInventorySubTab: (tab: any) => void;
 }
 
 export const ConfigurationView: React.FC<ConfigurationViewProps> = ({ 
@@ -32,9 +37,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   sectorList, onAddSector, onUpdateSector, onDeleteSector,
   userList, onAddUser, onUpdateUser, onDeleteUser,
   eventList, onAddEvent, onUpdateEvent, onDeleteEvent,
+  activeTab, setActiveTab, inventorySubTab, setInventorySubTab
 }) => {
-  const [activeTab, setActiveTab] = useState<'events' | 'inventory' | 'sectors' | 'users'>('events');
-  const [inventorySubTab, setInventorySubTab] = useState<'ativos' | 'itens'>('ativos');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -98,12 +102,10 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
       return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
-  // Helper para resolver o nome do criador
   const resolveCreatorName = (userIdOrName?: string) => {
       if (!userIdOrName) return 'Sistema';
-      // Se for um UUID, tenta encontrar na lista de usuários
       const user = userList.find(u => u.id === userIdOrName);
-      return user ? user.name : userIdOrName; // Retorna o nome ou o que estiver no campo
+      return user ? user.name : userIdOrName;
   };
 
   return (
@@ -123,7 +125,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
         </button>
       </div>
 
-      {/* TABS NAVEGAÇÃO */}
       <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar bg-white rounded-t-xl px-2">
         {[
             { id: 'events', label: 'Eventos', icon: Calendar },
@@ -143,7 +144,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
         ))}
       </div>
 
-      {/* SUB-TABS INVENTÁRIO */}
       {activeTab === 'inventory' && (
           <div className="flex gap-2 p-1.5 bg-gray-100 rounded-lg w-fit shadow-inner">
               <button 
@@ -161,7 +161,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           </div>
       )}
 
-      {/* FORMULÁRIO */}
       {isAdding && (
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-2xl animate-in slide-in-from-top-4 duration-300">
             <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-100 pb-3 uppercase tracking-tighter">
@@ -284,7 +283,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           </div>
       )}
 
-      {/* LISTAGEM */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -303,26 +301,15 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
              <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black">
-                        <th className="p-4">
-                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : 'Identificação Principal'}
-                        </th>
-                        <th className="p-4">
-                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : 'Datas / Info'}
-                        </th>
-                        <th className="p-4">
-                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado por' : 'Status / Vínculo'}
-                        </th>
+                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : 'Identificação Principal'}</th>
+                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : 'Datas / Info'}</th>
+                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado por' : 'Status / Vínculo'}</th>
                         <th className="p-4 text-right">Ações</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                     {filteredData().length === 0 ? (
-                        <tr><td colSpan={4} className="p-16 text-center text-gray-400 italic font-medium">
-                            <div className="flex flex-col items-center gap-2">
-                                <AlertCircle size={32} className="text-gray-200" />
-                                <span>Nenhum registro encontrado.</span>
-                            </div>
-                        </td></tr>
+                        <tr><td colSpan={4} className="p-16 text-center text-gray-400 italic font-medium">Nenhum registro encontrado.</td></tr>
                     ) : (
                         filteredData().map((item: any) => (
                             <tr key={item.id} className="hover:bg-brand-50/20 transition-colors group">
@@ -334,28 +321,14 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                             <span className="text-xs text-gray-900 font-bold">{item.name}</span>
                                         </div>
                                     )}
-                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && (
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-gray-100 rounded text-gray-400 group-hover:bg-brand-100 group-hover:text-brand-600 transition-colors"><Tags size={16}/></div>
-                                            <span className="font-bold text-gray-900">{item.name}</span>
-                                        </div>
-                                    )}
+                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && <span className="font-bold text-gray-900">{item.name}</span>}
                                     {activeTab === 'sectors' && <div className="font-black text-gray-900 tracking-tighter">{item.name}</div>}
-                                    {activeTab === 'users' && (
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-[10px] font-black text-brand-700">{item.avatarInitials}</div>
-                                            <div className="font-bold text-gray-900 text-sm">{item.name}</div>
-                                        </div>
-                                    )}
+                                    {activeTab === 'users' && <div className="font-bold text-gray-900 text-sm">{item.name}</div>}
                                 </td>
                                 <td className="p-4 text-sm">
                                     {activeTab === 'events' && <div className="text-gray-600 font-medium">{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>}
                                     {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-xs text-gray-500 uppercase font-bold">{item.category} | {item.brand} {item.model}</div>}
-                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && (
-                                        <div className="flex items-center gap-2 text-gray-500 font-mono text-xs">
-                                            <Clock size={12}/> {formatDate(item.createdAt)}
-                                        </div>
-                                    )}
+                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="text-gray-500 font-mono text-xs"><Clock size={12} className="inline mr-1"/> {formatDate(item.createdAt)}</div>}
                                     {activeTab === 'sectors' && <div className="text-xs text-gray-500">{item.coordinatorName || '-'}</div>}
                                     {activeTab === 'users' && <div className="text-xs font-black text-brand-600 uppercase">{item.role}</div>}
                                 </td>
@@ -382,14 +355,11 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                             if (activeTab === 'inventory' && inventorySubTab === 'itens') setItemFormData({name: item.name});
                                             if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || ''});
                                             if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: ''});
-                                            
                                             setEditingId(item.id);
                                             setIsAdding(true);
                                         }}
                                         className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all"
-                                    >
-                                        <Pencil size={16}/>
-                                    </button>
+                                    ><Pencil size={16}/></button>
                                     <button 
                                         onClick={() => {
                                             if (confirm('Deseja excluir permanentemente?')) {
@@ -403,9 +373,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                             }
                                         }}
                                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                    >
-                                        <Trash2 size={16}/>
-                                    </button>
+                                    ><Trash2 size={16}/></button>
                                 </td>
                             </tr>
                         ))

@@ -7,27 +7,24 @@ import { RentalForm } from './components/RentalForm';
 import { ConfigurationView } from './components/ConfigurationView';
 import { ReportView } from './components/ReportView';
 import { LoginScreen } from './components/LoginScreen';
-import { SYSTEM_LOGO } from './constants';
 import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories, EquipmentItem } from './types';
-import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, Menu, CheckCircle, Loader, X, Lock, Save, User as UserIcon, KeyRound, Tags, Lightbulb } from 'lucide-react';
+import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, CheckCircle, Loader, Lightbulb, RefreshCw } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { supabase, isConfigured, supabaseUrl, supabaseKey } from './services/supabaseClient';
+import { supabase, supabaseUrl, supabaseKey } from './services/supabaseClient';
 import { api } from './services/database';
 import { createClient } from '@supabase/supabase-js';
 
-const InventoryStatusChart = ({ equipment, rentals, currentEvent, items }: { equipment: Equipment[], rentals: Rental[], currentEvent: Event | null, items: EquipmentItem[] }) => {
+const InventoryStatusChart = ({ equipment, rentals, items }: { equipment: Equipment[], rentals: Rental[], currentEvent: Event | null, items: EquipmentItem[] }) => {
   const activeRentals = rentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
 
   const getStats = (itemName: string) => {
       const totalInventory = equipment.filter(e => e.category === itemName).length;
       let totalRented = 0;
-      
       if (itemName === 'Radio') {
           totalRented = activeRentals.length; 
       } else {
           totalRented = activeRentals.filter(r => r.radioModel.includes(itemName)).length;
       }
-      
       const available = Math.max(0, totalInventory - totalRented);
       const percentUsed = totalInventory > 0 ? (totalRented / totalInventory) * 100 : 0;
       return { totalInventory, totalRented, available, percentUsed };
@@ -58,13 +55,8 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, items }: { equ
                            <span className="text-brand-600 font-bold">{stats.totalRented}</span> em uso / <span className="text-gray-900">{stats.available}</span> disp.
                        </div>
                    </div>
-                   
                    <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden border border-gray-300 relative">
-                       <div 
-                         className={`h-full rounded-full transition-all duration-700 flex items-center justify-end pr-1 ${stats.percentUsed > 90 ? 'bg-red-500' : 'bg-brand-500'}`}
-                         style={{ width: `${Math.min(stats.percentUsed, 100)}%` }}
-                       >
-                       </div>
+                       <div className={`h-full rounded-full transition-all duration-700 ${stats.percentUsed > 90 ? 'bg-red-500' : 'bg-brand-500'}`} style={{ width: `${Math.min(stats.percentUsed, 100)}%` }} />
                    </div>
                    <div className="flex justify-between text-[10px] text-gray-400 uppercase tracking-wider font-bold">
                        <span>Estoque: {stats.totalInventory}</span>
@@ -72,9 +64,7 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, items }: { equ
                    </div>
                </div>
            );
-       }) : (
-           <div className="text-center text-gray-400 text-sm py-10">Nenhum ITEM cadastrado.</div>
-       )}
+       }) : <div className="text-center text-gray-400 text-sm py-10">Nenhum ITEM cadastrado.</div>}
     </div>
   );
 };
@@ -82,9 +72,7 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, items }: { equ
 const COLORS = ['#f59e0b', '#b45309', '#1f2937', '#6b7280', '#d97706', '#fbbf24', '#9ca3af', '#4b5563'];
 
 const SectorAllocationChart = ({ data }: { data: { name: string, count: number }[] }) => {
-  if (!data || data.length === 0) {
-     return <div className="h-full flex items-center justify-center text-gray-400 text-xs">Sem dados de alocação</div>;
-  }
+  if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-gray-400 text-xs">Sem dados de alocação</div>;
   const total = data.reduce((acc, curr) => acc + curr.count, 0);
   return (
     <div className="h-full w-full flex items-center gap-2">
@@ -94,7 +82,7 @@ const SectorAllocationChart = ({ data }: { data: { name: string, count: number }
               <Pie data={data} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="count" stroke="none">
                 {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
               </Pie>
-              <Tooltip formatter={(value: number) => [`${value} itens`, 'Qtd']} contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
+              <Tooltip formatter={(value: number) => [`${value} itens`, 'Qtd']} />
             </RechartsPieChart>
          </ResponsiveContainer>
          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
@@ -102,69 +90,31 @@ const SectorAllocationChart = ({ data }: { data: { name: string, count: number }
             <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Total</div>
          </div>
        </div>
-       <div className="w-1/2 h-[85%] overflow-y-auto pr-2 custom-scrollbar">
-          <div className="flex flex-col gap-2">
+       <div className="w-1/2 h-[85%] overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-2">
             {data.map((item, index) => (
                <div key={index} className="flex items-center justify-between text-xs group p-1 hover:bg-gray-50 rounded transition-colors">
                   <div className="flex items-center gap-2 min-w-0">
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
-                      <span className="text-gray-600 font-medium truncate" title={item.name}>{item.name}</span>
+                      <span className="text-gray-600 font-medium truncate">{item.name}</span>
                   </div>
-                  <span className="font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded text-[10px] border border-gray-200">{Math.round((item.count/total)*100)}%</span>
+                  <span className="font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">{Math.round((item.count/total)*100)}%</span>
                </div>
             ))}
-          </div>
        </div>
     </div>
   );
 };
 
-// --- PASSWORD RECOVERY MODAL ---
-interface PasswordRecoveryModalProps { onClose: () => void; }
-const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({ onClose }) => {
-    const [pass, setPass] = useState('');
-    const [confirm, setConfirm] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [msg, setMsg] = useState('');
-    const [isError, setIsError] = useState(false);
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setMsg(''); setIsError(false);
-        if (pass.length < 6) { setMsg('Mínimo 6 caracteres.'); setIsError(true); return; }
-        if (pass !== confirm) { setMsg('Senhas não conferem.'); setIsError(true); return; }
-        setLoading(true);
-        try {
-            const { error } = await supabase.auth.updateUser({ password: pass });
-            if (error) throw error;
-            setMsg('Senha redefinida com sucesso!');
-            setTimeout(() => { onClose(); window.history.replaceState(null, '', window.location.pathname); }, 2000);
-        } catch (e: any) { setMsg(e.message || 'Erro ao redefinir.'); setIsError(true); } finally { setLoading(false); }
-    };
-    return (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 border-t-4 border-brand-500">
-                <div className="text-center mb-6"><h3 className="text-xl font-bold">Nova Senha</h3></div>
-                <form onSubmit={handleSave} className="space-y-4">
-                    <input type="password" required className="w-full bg-gray-50 border p-3 rounded-lg" value={pass} onChange={e => setPass(e.target.value)} placeholder="Nova Senha" />
-                    <input type="password" required className="w-full bg-gray-50 border p-3 rounded-lg" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Confirmar Senha" />
-                    {msg && <div className={`p-3 rounded-lg text-xs font-bold text-center ${isError ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{msg}</div>}
-                    <button type="submit" disabled={loading} className="w-full py-3 bg-brand-500 text-white font-bold rounded-lg">{loading ? <Loader className="animate-spin m-auto"/> : 'Redefinir Senha'}</button>
-                </form>
-            </div>
-        </div>
-    );
-};
-
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [session, setSession] = useState<any>(null);
   const [view, setView] = useState<ViewState>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
   
-  // Data States
+  // Persistência de abas para as configurações
+  const [configTab, setConfigTab] = useState<'events' | 'inventory' | 'sectors' | 'users'>('events');
+  const [configInventorySubTab, setConfigInventorySubTab] = useState<'ativos' | 'itens'>('ativos');
+
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [items, setItems] = useState<EquipmentItem[]>([]);
@@ -188,9 +138,8 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); if (session?.user) loadAndVerifyUser(session); });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
+    supabase.auth.getSession().then(({ data: { session } }) => { if (session?.user) loadAndVerifyUser(session); });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) loadAndVerifyUser(session);
       else setCurrentUser(null);
     });
@@ -203,15 +152,8 @@ const App: React.FC = () => {
       setIsLoadingData(true);
       try {
           const loadSafe = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => { 
-              try { 
-                  const result = await promise; 
-                  return result || fallback;
-              } catch (e) { 
-                  console.error("Fetch failure", e);
-                  return fallback; 
-              } 
+              try { return await promise || fallback; } catch (e) { return fallback; } 
           };
-
           const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedItems] = await Promise.all([
               loadSafe(api.fetchEvents(), []),
               loadSafe(api.fetchEquipment(), []),
@@ -220,21 +162,15 @@ const App: React.FC = () => {
               loadSafe(api.fetchUsers(), []),
               loadSafe(api.fetchItems(), [])
           ]);
-
           setEvents(loadedEvents);
           setEquipmentList(loadedEq);
           setSectors(loadedSectors);
           setRentals(loadedRentals);
           setItems(loadedItems);
           setUsers(loadedUsers);
-          
           const active = loadedEvents.find(e => e.isActive) || (loadedEvents.length > 0 ? loadedEvents[0] : null);
           if (active) setCurrentEventId(active.id);
-      } catch (error) { 
-          console.error("General Fetch Data Error", error); 
-      } finally { 
-          setIsLoadingData(false); 
-      }
+      } finally { setIsLoadingData(false); }
   };
 
   const currentEvent = useMemo(() => events.find(e => e.id === currentEventId) || null, [events, currentEventId]);
@@ -271,17 +207,18 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (isLoadingData) return <div className="h-full flex items-center justify-center text-brand-600 gap-4"><Loader className="animate-spin" size={32}/> <span className="font-bold font-mono tracking-tighter">SINCRONIZANDO COM O SERVIDOR...</span></div>;
+    // Só exibe loader em tela cheia na primeira carga, depois usa overlay se necessário
+    if (isLoadingData && rentals.length === 0) return <div className="h-full flex items-center justify-center text-brand-600 gap-4"><Loader className="animate-spin" size={32}/> <span className="font-bold font-mono tracking-tighter uppercase">Sincronizando Banco de Dados...</span></div>;
+    
     switch (view) {
       case 'dashboard':
         return (
-          <div className="space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0">
+          <div className="space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0 relative">
+            {isLoadingData && <div className="absolute top-0 right-0 p-2 text-brand-500 flex items-center gap-2 text-xs font-bold animate-pulse"><RefreshCw className="animate-spin" size={14}/> Sincronizando...</div>}
              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                <div>
                   <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Dashboard Central</h2>
-                  <p className="text-gray-500 mt-1 text-sm md:text-base">
-                      {currentEvent ? <>Evento Selecionado: <span className="text-brand-600 font-black">{currentEvent.name}</span></> : "Selecione um evento nas configurações."}
-                  </p>
+                  <p className="text-gray-500 mt-1 text-sm md:text-base">{currentEvent ? <>Evento Selecionado: <span className="text-brand-600 font-black">{currentEvent.name}</span></> : "Selecione um evento nas configurações."}</p>
                </div>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
@@ -313,22 +250,13 @@ const App: React.FC = () => {
             onUpdateEquipment={async (d) => { await api.updateEquipment(d); fetchData(); }} 
             onDeleteEquipment={async (id) => { await api.deleteEquipment(id); fetchData(); }}
             itemList={items} 
-            onAddItem={async (n) => { 
-                if (currentUser) {
-                  try {
-                    await api.createItem(n, currentUser.id); 
-                    await fetchData(); 
-                  } catch (e) {
-                    alert("Erro ao criar item. Verifique se as políticas de RLS estão aplicadas no banco.");
-                  }
-                }
-            }} 
-            onUpdateItem={async (id, n) => { await api.updateItem(id, n); fetchData(); }} 
-            onDeleteItem={async (id) => { await api.deleteItem(id); fetchData(); }}
+            onAddItem={async (n) => { if (currentUser) { await api.createItem(n, currentUser.id); await fetchData(); } }} 
+            onUpdateItem={async (id, n) => { await api.updateItem(id, n); await fetchData(); }} 
+            onDeleteItem={async (id) => { await api.deleteItem(id); await fetchData(); }}
             sectorList={sectors} 
-            onAddSector={async (d) => { await api.createSector(d); fetchData(); }} 
-            onUpdateSector={async (d) => { await api.updateSector(d); fetchData(); }} 
-            onDeleteSector={async (id) => { await api.deleteSector(id); fetchData(); }}
+            onAddSector={async (d) => { await api.createSector(d); await fetchData(); }} 
+            onUpdateSector={async (d) => { await api.updateSector(d); await fetchData(); }} 
+            onDeleteSector={async (id) => { await api.deleteSector(id); await fetchData(); }}
             userList={users} 
             onAddUser={async (d) => { 
                 const tempClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
@@ -336,12 +264,17 @@ const App: React.FC = () => {
                 if (data.user) await api.createProfile({ id: data.user.id, name: d.name, email: d.email, role: d.role, avatarInitials: d.name.substring(0,2).toUpperCase() });
                 fetchData();
             }} 
-            onUpdateUser={async (d) => { await api.updateProfile(d); fetchData(); }} 
+            onUpdateUser={async (d) => { await api.updateProfile(d); await fetchData(); }} 
             onDeleteUser={() => {}} 
             eventList={events} 
-            onAddEvent={async (d) => { await api.createEvent(d); fetchData(); }} 
-            onUpdateEvent={async (d) => { await api.updateEvent(d); fetchData(); }} 
+            onAddEvent={async (d) => { await api.createEvent(d); await fetchData(); }} 
+            onUpdateEvent={async (d) => { await api.updateEvent(d); await fetchData(); }} 
             onDeleteEvent={() => {}}
+            // Passando o estado controlado de abas
+            activeTab={configTab}
+            setActiveTab={setConfigTab}
+            inventorySubTab={configInventorySubTab}
+            setInventorySubTab={setConfigInventorySubTab}
         />;
       default: return <div>View not found</div>;
     }
@@ -351,9 +284,10 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans flex-col md:flex-row">
-      <Sidebar currentView={view} onChangeView={setView} currentUser={currentUser} onLogout={() => supabase.auth.signOut()} onProfileClick={() => setIsProfileModalOpen(true)} currentEvent={currentEvent} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen"><div className="max-w-7xl mx-auto">{renderContent()}</div></main>
-      {isRecoveryModalOpen && <PasswordRecoveryModal onClose={() => setIsRecoveryModalOpen(false)} />}
+      <Sidebar currentView={view} onChangeView={setView} currentUser={currentUser} onLogout={() => supabase.auth.signOut()} currentEvent={currentEvent} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen relative">
+        <div className="max-w-7xl mx-auto">{renderContent()}</div>
+      </main>
     </div>
   );
 };

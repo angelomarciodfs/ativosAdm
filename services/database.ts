@@ -95,14 +95,23 @@ export const api = {
     return mapItem(data);
   },
   updateItem: async (id: string, name: string) => {
+    // Removemos .single() para evitar erro se RLS bloquear o retorno
     const { data, error } = await supabase
       .from('equipment_categories')
       .update({ name })
       .eq('id', id)
-      .select('id, name, created_at, created_by')
-      .single();
-    if (error) throw error;
-    return mapItem(data);
+      .select('id, name, created_at, created_by');
+    
+    if (error) {
+      console.error("Erro no updateItem:", error);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      throw new Error("Não foi possível atualizar o item. Verifique suas permissões.");
+    }
+
+    return mapItem(data[0]);
   },
   deleteItem: async (id: string) => {
     const { error } = await supabase.from('equipment_categories').delete().eq('id', id);
@@ -256,8 +265,8 @@ export const api = {
       if (status === 'Devolvido') {
           updates.actual_return_date = new Date().toISOString().split('T')[0];
       }
-      const { data, error } = await supabase.from('rentals').update(updates).eq('id', id).select().single();
+      const { data, error } = await supabase.from('rentals').update(updates).eq('id', id).select();
       if (error) throw error;
-      return mapRental(data);
+      return mapRental(data[0]);
   }
 };
