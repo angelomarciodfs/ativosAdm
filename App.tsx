@@ -313,7 +313,7 @@ const App: React.FC = () => {
             onUpdateEquipment={async (d) => { await api.updateEquipment(d); fetchData(); }} 
             onDeleteEquipment={async (id) => { await api.deleteEquipment(id); fetchData(); }}
             itemList={items} 
-            onAddItem={async (n) => { if(currentUser) { await api.createItem(n, currentUser.id); fetchData(); } }} 
+            onAddItem={async (n) => { await api.createItem(n); fetchData(); }} 
             onUpdateItem={async (id, n) => { await api.updateItem(id, n); fetchData(); }} 
             onDeleteItem={async (id) => { await api.deleteItem(id); fetchData(); }}
             sectorList={sectors} 

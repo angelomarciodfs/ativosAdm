@@ -9,7 +9,7 @@ const mapItem = (c: any): EquipmentItem => {
     id: c.id,
     name: c.name,
     createdAt: c.created_at,
-    createdBy: c.created_by // Retorna o ID (UUID) do criador
+    createdBy: c.created_by || 'Sistema' // Fallback caso a coluna venha a existir
   };
 };
 
@@ -72,10 +72,10 @@ export const api = {
   // ITEMS (EQUIPMENT CATEGORIES)
   fetchItems: async () => {
     try {
-      // Busca simples sem Join para evitar erro PGRST200
+      // Busca apenas colunas garantidas: id, name, created_at
       const { data, error } = await supabase
         .from('equipment_categories')
-        .select('*')
+        .select('id, name, created_at')
         .order('name');
       
       if (error) throw error;
@@ -85,14 +85,14 @@ export const api = {
       return [];
     }
   },
-  createItem: async (name: string, userId: string) => {
+  createItem: async (name: string) => {
+    // Removido created_by do insert para evitar erro PGRST204
     const { data, error } = await supabase
       .from('equipment_categories')
       .insert({ 
-        name: name, 
-        created_by: userId 
+        name: name
       })
-      .select('*')
+      .select('id, name, created_at')
       .single();
       
     if (error) {
@@ -106,7 +106,7 @@ export const api = {
       .from('equipment_categories')
       .update({ name })
       .eq('id', id)
-      .select('*')
+      .select('id, name, created_at')
       .single();
     if (error) throw error;
     return mapItem(data);
