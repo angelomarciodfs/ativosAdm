@@ -6,7 +6,9 @@ import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, Categor
 
 const mapCategory = (c: any): Category => ({
   id: c.id,
-  name: c.name
+  name: c.name,
+  createdAt: c.created_at,
+  createdBy: c.profiles?.name || 'Sistema'
 });
 
 const mapUser = (u: any): User => ({
@@ -67,17 +69,29 @@ const mapRental = (r: any): Rental => ({
 export const api = {
   // CATEGORIES
   fetchCategories: async () => {
-    const { data, error } = await supabase.from('equipment_categories').select('*').order('name');
+    const { data, error } = await supabase
+      .from('equipment_categories')
+      .select('*, profiles(name)')
+      .order('name');
     if (error) throw error;
     return data.map(mapCategory);
   },
-  createCategory: async (name: string) => {
-    const { data, error } = await supabase.from('equipment_categories').insert({ name }).select().single();
+  createCategory: async (name: string, userId: string) => {
+    const { data, error } = await supabase
+      .from('equipment_categories')
+      .insert({ name, created_by: userId })
+      .select('*, profiles(name)')
+      .single();
     if (error) throw error;
     return mapCategory(data);
   },
   updateCategory: async (id: string, name: string) => {
-    const { data, error } = await supabase.from('equipment_categories').update({ name }).eq('id', id).select().single();
+    const { data, error } = await supabase
+      .from('equipment_categories')
+      .update({ name })
+      .eq('id', id)
+      .select('*, profiles(name)')
+      .single();
     if (error) throw error;
     return mapCategory(data);
   },

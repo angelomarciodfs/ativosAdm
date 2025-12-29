@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { StatCard } from './components/StatCard';
@@ -72,7 +73,7 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, categories }: 
                </div>
            );
        }) : (
-           <div className="text-center text-gray-400 text-sm py-10">Cadastre Itens (Categorias) para ver métricas.</div>
+           <div className="text-center text-gray-400 text-sm py-10">Cadastre Itens para ver métricas.</div>
        )}
        {!currentEvent && (
            <div className="text-center text-[10px] text-red-400 mt-2 bg-red-50/50 p-1 rounded">
@@ -300,7 +301,7 @@ const App: React.FC = () => {
       case 'settings':
         return <ConfigurationView 
             equipmentList={equipmentList} onAddEquipment={async (d) => { await api.createEquipment(d); fetchData(); }} onUpdateEquipment={async (d) => { await api.updateEquipment(d); fetchData(); }} onDeleteEquipment={async (id) => { await api.deleteEquipment(id); fetchData(); }}
-            categoryList={categories} onAddCategory={async (n) => { await api.createCategory(n); fetchData(); }} onUpdateCategory={async (id, n) => { await api.updateCategory(id, n); fetchData(); }} onDeleteCategory={async (id) => { await api.deleteCategory(id); fetchData(); }}
+            categoryList={categories} onAddCategory={async (n) => { if(currentUser) await api.createCategory(n, currentUser.id); fetchData(); }} onUpdateCategory={async (id, n) => { await api.updateCategory(id, n); fetchData(); }} onDeleteCategory={async (id) => { await api.deleteCategory(id); fetchData(); }}
             sectorList={sectors} onAddSector={async (d) => { await api.createSector(d); fetchData(); }} onUpdateSector={async (d) => { await api.updateSector(d); fetchData(); }} onDeleteSector={async (id) => { await api.deleteSector(id); fetchData(); }}
             userList={users} onAddUser={async (d) => { 
                 const tempClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });

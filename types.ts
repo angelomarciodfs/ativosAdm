@@ -10,6 +10,8 @@ export enum RentalStatus {
 export interface Category {
   id: string;
   name: string;
+  createdAt?: string;
+  createdBy?: string; // Nome do usuário que criou
 }
 
 export interface Equipment {
@@ -18,7 +20,7 @@ export interface Equipment {
   name: string; 
   brand: string;
   model: string;
-  category: string; // Agora é uma string dinâmica (nome da categoria)
+  category: string; 
   createdAt: string; 
 }
 
