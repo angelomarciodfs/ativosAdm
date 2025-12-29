@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Equipment, Sector, User, UserRole, Event, Category } from '../types';
-import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Key, Tags, ChevronRight, LayoutGrid } from 'lucide-react';
+import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Tags, ChevronRight, LayoutGrid, Clock, UserCheck } from 'lucide-react';
 
 interface ConfigurationViewProps {
   equipmentList: Equipment[];
@@ -33,7 +33,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   sectorList, onAddSector, onUpdateSector, onDeleteSector,
   userList, onAddUser, onUpdateUser, onDeleteUser,
   eventList, onAddEvent, onUpdateEvent, onDeleteEvent,
-  onResetUserPassword
 }) => {
   const [activeTab, setActiveTab] = useState<'events' | 'inventory' | 'sectors' | 'users'>('events');
   const [inventorySubTab, setInventorySubTab] = useState<'ativos' | 'itens'>('ativos');
@@ -71,8 +70,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
             onAddEquipment({ ...eqFormData, createdAt: new Date().toISOString().split('T')[0] });
         }
     } else if (activeTab === 'sectors') {
-        if (editingId) onUpdateSector({ id: editingId, ...sectorFormData, name: sectorFormData.name.toUpperCase() });
-        else onAddSector({ ...sectorFormData, name: sectorFormData.name.toUpperCase() });
+        if (editingId) onUpdateSector({ id: editingId, ...sectorFormData });
+        else onAddSector(sectorFormData);
     } else if (activeTab === 'users') {
         if (editingId) onUpdateUser({ id: editingId, ...userFormData, avatarInitials: userFormData.name.substring(0, 2).toUpperCase() });
         else onAddUser(userFormData);
@@ -104,22 +103,20 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     <div className="space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Configurações</h2>
-          <p className="text-gray-500 mt-1 text-sm">Gerencie eventos, inventário e usuários.</p>
+          <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Configurações Gerais</h2>
+          <p className="text-gray-500 mt-1 text-sm font-medium">Controle de inventário, eventos e usuários do sistema.</p>
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
-            <button 
-              onClick={() => { setIsAdding(!isAdding); if(isAdding) resetForms(); }}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold transition-all shadow-lg flex-1 md:flex-none justify-center ${
-                isAdding ? 'bg-white text-red-600 border border-red-200 hover:bg-red-50' : 'bg-brand-500 text-white hover:bg-brand-600'
-              }`}
-            >
-              {isAdding ? 'Cancelar' : <><Plus size={18} /> Novo Registro</>}
-            </button>
-        </div>
+        <button 
+          onClick={() => { setIsAdding(!isAdding); if(isAdding) resetForms(); }}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold transition-all shadow-lg w-full md:w-auto justify-center ${
+            isAdding ? 'bg-white text-red-600 border border-red-200 hover:bg-red-50' : 'bg-brand-500 text-white hover:bg-brand-600 shadow-brand-500/20'
+          }`}
+        >
+          {isAdding ? 'Cancelar' : <><Plus size={18} /> Novo Registro</>}
+        </button>
       </div>
 
-      {/* NAVEGAÇÃO POR ABAS */}
+      {/* TABS PRINCIPAIS */}
       <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar bg-white rounded-t-xl px-2">
         {[
             { id: 'events', label: 'Eventos', icon: Calendar },
@@ -131,7 +128,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
               key={tab.id} 
               onClick={() => { setActiveTab(tab.id as any); resetForms(); }} 
               className={`px-6 py-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
-                activeTab === tab.id ? 'border-brand-500 text-brand-600 bg-brand-50/10' : 'border-transparent text-gray-500 hover:text-gray-900'
+                activeTab === tab.id ? 'border-brand-500 text-brand-600 bg-brand-50/20' : 'border-transparent text-gray-500 hover:text-gray-900'
               }`}
             >
                 <tab.icon size={18} /> {tab.label}
@@ -139,181 +136,185 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
         ))}
       </div>
 
-      {/* SUB-TABS INVENTÁRIO */}
+      {/* SUB-TABS PARA INVENTÁRIO */}
       {activeTab === 'inventory' && (
-          <div className="flex gap-1 p-1 bg-gray-200 rounded-lg w-fit shadow-inner">
+          <div className="flex gap-2 p-1.5 bg-gray-200/50 rounded-lg w-fit shadow-inner">
               <button 
-                onClick={() => { setInventorySubTab('ativos'); if(isAdding) setIsAdding(false); }}
-                className={`px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'ativos' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => { setInventorySubTab('ativos'); if(isAdding) resetForms(); }}
+                className={`px-5 py-2 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'ativos' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 Ativos Físicos
               </button>
               <button 
-                onClick={() => { setInventorySubTab('itens'); if(isAdding) setIsAdding(false); }}
-                className={`px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'itens' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => { setInventorySubTab('itens'); if(isAdding) resetForms(); }}
+                className={`px-5 py-2 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'itens' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 Gerenciar ITENS
               </button>
           </div>
       )}
 
-      {/* FORMULÁRIO DINÂMICO */}
+      {/* FORMULÁRIO DE CADASTRO */}
       {isAdding && (
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-2xl animate-in slide-in-from-top-4 duration-300">
-             <div className="flex items-center justify-between mb-6 border-b border-gray-100 pb-3">
-                <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
-                    <Plus size={20} className="text-brand-500" /> 
-                    {editingId ? 'Editar' : 'Novo'} 
-                    <span className="text-gray-400 font-medium">| {activeTab === 'inventory' ? (inventorySubTab === 'ativos' ? 'Ativo' : 'ITEM') : activeTab}</span>
-                </h3>
-             </div>
-
-             <form onSubmit={handleSubmit} className="space-y-6">
-                 {activeTab === 'events' && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-100 pb-3">
+                <Plus size={20} className="text-brand-500" /> 
+                {editingId ? 'Editar Registro' : 'Novo Registro'} 
+                <span className="text-gray-400 font-normal ml-2">| {activeTab === 'inventory' ? (inventorySubTab === 'ativos' ? 'Ativo' : 'ITEM') : activeTab.toUpperCase()}</span>
+            </h3>
+            
+            <form onSubmit={handleSubmit} className="space-y-6">
+                {activeTab === 'events' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2 space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Nome do Evento</label>
-                            <input required type="text" className="w-full bg-gray-50 border p-3 rounded-lg" value={eventFormData.name} onChange={e => setEventFormData({...eventFormData, name: e.target.value})} placeholder="Ex: TOP 1109 - Ed. 55" />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do Evento</label>
+                            <input required type="text" placeholder="Ex: TOP 1109 - Ed. 55" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 focus:border-brand-500 focus:outline-none" value={eventFormData.name} onChange={e => setEventFormData({...eventFormData, name: e.target.value})} />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Início</label>
-                            <input required type="date" className="w-full bg-gray-50 border p-3 rounded-lg" value={eventFormData.startDate} onChange={e => setEventFormData({...eventFormData, startDate: e.target.value})} />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Data Início</label>
+                            <input required type="date" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eventFormData.startDate} onChange={e => setEventFormData({...eventFormData, startDate: e.target.value})} />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Fim</label>
-                            <input required type="date" className="w-full bg-gray-50 border p-3 rounded-lg" value={eventFormData.endDate} onChange={e => setEventFormData({...eventFormData, endDate: e.target.value})} />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Data Fim</label>
+                            <input required type="date" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eventFormData.endDate} onChange={e => setEventFormData({...eventFormData, endDate: e.target.value})} />
                         </div>
-                        <div className="flex items-center gap-2 py-4">
-                            <input type="checkbox" id="evActive" checked={eventFormData.isActive} onChange={e => setEventFormData({...eventFormData, isActive: e.target.checked})} className="w-5 h-5 accent-brand-500" />
-                            <label htmlFor="evActive" className="text-sm font-bold text-gray-700">Evento Ativo Atualmente</label>
+                        <div className="flex items-center gap-2 py-2">
+                            <input type="checkbox" id="isActive" checked={eventFormData.isActive} onChange={e => setEventFormData({...eventFormData, isActive: e.target.checked})} className="w-5 h-5 accent-brand-500 rounded" />
+                            <label htmlFor="isActive" className="text-sm font-bold text-gray-700">Evento Ativo Atualmente</label>
                         </div>
-                     </div>
-                 )}
+                    </div>
+                )}
 
-                 {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase flex justify-between">
+                            <label className="text-xs uppercase text-gray-500 font-bold flex justify-between items-center">
                                 ITEM (Tipo)
-                                <button type="button" onClick={() => setInventorySubTab('itens')} className="text-brand-600 hover:underline text-[10px]">Gerenciar Itens</button>
+                                <button type="button" onClick={() => { setInventorySubTab('itens'); setIsAdding(true); setEditingId(null); }} className="text-brand-600 hover:underline text-[10px] font-black">ADICIONAR ITEM +</button>
                             </label>
-                            <select required className="w-full bg-gray-50 border p-3 rounded-lg" value={eqFormData.category} onChange={e => setEqFormData({...eqFormData, category: e.target.value})}>
+                            <select required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.category} onChange={e => setEqFormData({...eqFormData, category: e.target.value})}>
                                 <option value="">Selecione...</option>
                                 {categoryList.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-brand-600 uppercase">Patrimônio / Tag</label>
-                            <input required type="text" className="w-full bg-gray-50 border border-brand-200 p-3 rounded-lg font-mono font-bold" value={eqFormData.inventoryNumber} onChange={e => setEqFormData({...eqFormData, inventoryNumber: e.target.value.toUpperCase()})} placeholder="Ex: R-01" />
+                            <label className="text-xs uppercase text-brand-600 font-bold">Patrimônio (Tag)</label>
+                            <input required type="text" placeholder="Ex: R-01" className="w-full bg-gray-50 border border-brand-200 rounded-lg p-3 font-mono font-bold" value={eqFormData.inventoryNumber} onChange={e => setEqFormData({...eqFormData, inventoryNumber: e.target.value.toUpperCase()})} />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Nome / Descrição</label>
-                            <input required type="text" className="w-full bg-gray-50 border p-3 rounded-lg" value={eqFormData.name} onChange={e => setEqFormData({...eqFormData, name: e.target.value})} placeholder="Ex: Rádio Coordenação" />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Nome Identificador</label>
+                            <input required type="text" placeholder="Ex: Rádio Coordenação" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.name} onChange={e => setEqFormData({...eqFormData, name: e.target.value})} />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Marca</label>
-                            <input required type="text" className="w-full bg-gray-50 border p-3 rounded-lg" value={eqFormData.brand} onChange={e => setEqFormData({...eqFormData, brand: e.target.value})} />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Marca</label>
+                            <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.brand} onChange={e => setEqFormData({...eqFormData, brand: e.target.value})} />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Modelo</label>
-                            <input required type="text" className="w-full bg-gray-50 border p-3 rounded-lg" value={eqFormData.model} onChange={e => setEqFormData({...eqFormData, model: e.target.value})} />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Modelo</label>
+                            <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.model} onChange={e => setEqFormData({...eqFormData, model: e.target.value})} />
                         </div>
-                     </div>
-                 )}
+                    </div>
+                )}
 
-                 {activeTab === 'inventory' && inventorySubTab === 'itens' && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                {activeTab === 'inventory' && inventorySubTab === 'itens' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Nome do ITEM (Tipo de Ativo)</label>
-                            <input required type="text" className="w-full bg-gray-50 border p-3 rounded-lg" value={catFormData.name} onChange={e => setCatFormData({name: e.target.value})} placeholder="Ex: Lanterna, PowerBank, etc" />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do ITEM (Ex: Lanterna, PowerBank)</label>
+                            <input required type="text" placeholder="Digite o nome do novo item..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={catFormData.name} onChange={e => setCatFormData({name: e.target.value})} />
                         </div>
-                     </div>
-                 )}
+                    </div>
+                )}
 
-                 {activeTab === 'sectors' && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeTab === 'sectors' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Sigla do Setor</label>
-                            <input required type="text" className="w-full bg-gray-50 border p-3 rounded-lg font-bold" value={sectorFormData.name} onChange={e => setSectorFormData({...sectorFormData, name: e.target.value.toUpperCase()})} placeholder="Ex: ADM, LOG" />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Sigla do Setor</label>
+                            <input required type="text" placeholder="Ex: ADM, LOG" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold uppercase" value={sectorFormData.name} onChange={e => setSectorFormData({...sectorFormData, name: e.target.value.toUpperCase()})} />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Coordenador</label>
-                            <input type="text" className="w-full bg-gray-50 border p-3 rounded-lg" value={sectorFormData.coordinatorName} onChange={e => setSectorFormData({...sectorFormData, coordinatorName: e.target.value})} />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Coordenador</label>
+                            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.coordinatorName} onChange={e => setSectorFormData({...sectorFormData, coordinatorName: e.target.value})} />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">WhatsApp</label>
-                            <input type="tel" className="w-full bg-gray-50 border p-3 rounded-lg" value={sectorFormData.coordinatorPhone} onChange={e => setSectorFormData({...sectorFormData, coordinatorPhone: e.target.value})} placeholder="(00) 00000-0000" />
+                            <label className="text-xs uppercase text-gray-500 font-bold">WhatsApp</label>
+                            <input type="tel" placeholder="(00) 00000-0000" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.coordinatorPhone} onChange={e => setSectorFormData({...sectorFormData, coordinatorPhone: e.target.value})} />
                         </div>
-                     </div>
-                 )}
+                    </div>
+                )}
 
-                 {activeTab === 'users' && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeTab === 'users' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Nome Completo</label>
-                            <input required type="text" className="w-full bg-gray-50 border p-3 rounded-lg" value={userFormData.name} onChange={e => setUserFormData({...userFormData, name: e.target.value})} />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Nome Completo</label>
+                            <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.name} onChange={e => setUserFormData({...userFormData, name: e.target.value})} />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Email</label>
-                            <input required type="email" className="w-full bg-gray-50 border p-3 rounded-lg" value={userFormData.email} onChange={e => setUserFormData({...userFormData, email: e.target.value})} disabled={!!editingId} />
+                            <label className="text-xs uppercase text-gray-500 font-bold">Email</label>
+                            <input required type="email" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.email} onChange={e => setUserFormData({...userFormData, email: e.target.value})} disabled={!!editingId} />
                         </div>
                         {!editingId && (
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Senha Temporária</label>
-                                <input required type="password" px-3 className="w-full bg-gray-50 border p-3 rounded-lg" value={userFormData.password} onChange={e => setUserFormData({...userFormData, password: e.target.value})} placeholder="Mín. 6 dígitos" />
+                                <label className="text-xs uppercase text-gray-500 font-bold">Senha Inicial</label>
+                                <input required type="password" placeholder="Mínimo 6 caracteres" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.password} onChange={e => setUserFormData({...userFormData, password: e.target.value})} />
                             </div>
                         )}
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Perfil</label>
-                            <select className="w-full bg-gray-50 border p-3 rounded-lg" value={userFormData.role} onChange={e => setUserFormData({...userFormData, role: e.target.value as UserRole})}>
-                                <option value="USER">Operador (Locações)</option>
-                                <option value="ADMIN">Administrador (Total)</option>
+                            <label className="text-xs uppercase text-gray-500 font-bold">Perfil de Acesso</label>
+                            <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.role} onChange={e => setUserFormData({...userFormData, role: e.target.value as UserRole})}>
+                                <option value="USER">Operador (Apenas Locações)</option>
+                                <option value="ADMIN">Administrador (Gestão Total)</option>
                             </select>
                         </div>
-                     </div>
-                 )}
+                    </div>
+                )}
 
-                 <div className="flex gap-4 pt-6 border-t border-gray-100">
-                    <button type="button" onClick={resetForms} className="flex-1 py-3 border border-gray-200 text-gray-600 font-bold rounded-lg hover:bg-gray-50 transition-colors">Descartar</button>
-                    <button type="submit" className="flex-1 py-3 bg-brand-500 text-white font-bold rounded-lg hover:bg-brand-600 shadow-xl shadow-brand-500/30 flex items-center justify-center gap-2">
+                <div className="flex gap-4 pt-4 border-t border-gray-100">
+                    <button type="button" onClick={resetForms} className="flex-1 py-3.5 border border-gray-200 text-gray-600 font-black rounded-lg hover:bg-gray-50 transition-colors uppercase text-xs tracking-widest">Descartar</button>
+                    <button type="submit" className="flex-1 py-3.5 bg-brand-500 text-white font-black rounded-lg hover:bg-brand-600 shadow-xl shadow-brand-500/30 flex items-center justify-center gap-2 uppercase text-xs tracking-widest">
                         <Save size={18} /> Salvar Registro
                     </button>
-                 </div>
-             </form>
+                </div>
+            </form>
           </div>
       )}
 
       {/* LISTAGEM DE REGISTROS */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+        <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-             <h3 className="text-lg font-black text-gray-900 tracking-tight">Listagem</h3>
-             <span className="bg-gray-100 text-[10px] font-black text-gray-400 px-2 py-0.5 rounded-full border border-gray-200">
+             <h3 className="text-lg font-black text-gray-900 tracking-tight">Listagem Sincronizada</h3>
+             <span className="bg-gray-100 text-[10px] font-black text-gray-500 px-2 py-0.5 rounded-full border border-gray-200 uppercase tracking-tighter">
                 {filteredData().length} Total
              </span>
           </div>
           <div className="relative w-full md:w-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2 bg-gray-50 border rounded-lg text-sm w-full md:w-64 focus:ring-1 focus:ring-brand-500 focus:outline-none" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+            <input type="text" placeholder="Filtrar nesta lista..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm w-full md:w-64 focus:ring-1 focus:ring-brand-500 focus:outline-none" />
           </div>
         </div>
 
         <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+             <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
-                    <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] uppercase font-black tracking-widest text-gray-400">
-                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : 'Identificação'}</th>
-                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data Criação' : 'Detalhes / Status'}</th>
-                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado por' : 'Vinculo'}</th>
+                    <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black">
+                        <th className="p-4">
+                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : 'Identificação Principal'}
+                        </th>
+                        <th className="p-4">
+                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : 'Detalhes Técnicos / Info'}
+                        </th>
+                        <th className="p-4">
+                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado por' : 'Status / Vínculo'}
+                        </th>
                         <th className="p-4 text-right">Ações</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                     {filteredData().length === 0 ? (
-                        <tr><td colSpan={4} className="p-10 text-center text-gray-400 italic">Nenhum registro encontrado.</td></tr>
+                        <tr><td colSpan={4} className="p-12 text-center text-gray-400 italic font-medium">Nenhum registro encontrado nesta categoria.</td></tr>
                     ) : (
                         filteredData().map((item: any) => (
-                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                            <tr key={item.id} className="hover:bg-brand-50/20 transition-colors group">
                                 <td className="p-4">
                                     {activeTab === 'events' && <div className="font-bold text-gray-900">{item.name}</div>}
                                     {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
@@ -322,26 +323,45 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                             <span className="text-xs text-gray-900 font-bold">{item.name}</span>
                                         </div>
                                     )}
-                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="font-black text-gray-900">{item.name}</div>}
-                                    {activeTab === 'sectors' && <div className="font-black text-gray-900">{item.name}</div>}
-                                    {activeTab === 'users' && <div className="font-bold text-gray-900">{item.name}</div>}
+                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && (
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-gray-100 rounded text-gray-400 group-hover:bg-brand-100 group-hover:text-brand-600 transition-colors"><Tags size={16}/></div>
+                                            <span className="font-bold text-gray-900">{item.name}</span>
+                                        </div>
+                                    )}
+                                    {activeTab === 'sectors' && <div className="font-black text-gray-900 tracking-tighter">{item.name}</div>}
+                                    {activeTab === 'users' && (
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-[10px] font-black text-brand-700">{item.avatarInitials}</div>
+                                            <div className="font-bold text-gray-900 text-sm">{item.name}</div>
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="p-4 text-sm">
-                                    {activeTab === 'events' && <div className="text-gray-500">{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>}
-                                    {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-xs font-bold text-gray-400 uppercase">{item.category}</div>}
-                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="text-xs text-gray-500 font-mono">{formatDate(item.createdAt)}</div>}
-                                    {activeTab === 'sectors' && <div className="text-xs text-gray-500">{item.coordinatorName || '-'}</div>}
-                                    {activeTab === 'users' && <div className="text-xs text-brand-600 font-bold uppercase">{item.role}</div>}
+                                    {activeTab === 'events' && <div className="text-gray-600 font-medium">Período: {formatDate(item.startDate)} - {formatDate(item.endDate)}</div>}
+                                    {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-xs text-gray-500 uppercase font-bold">{item.category} | {item.brand} {item.model}</div>}
+                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && (
+                                        <div className="flex items-center gap-2 text-gray-500 font-mono text-xs">
+                                            <Clock size={12}/> {formatDate(item.createdAt)}
+                                        </div>
+                                    )}
+                                    {activeTab === 'sectors' && <div className="text-xs text-gray-500 font-medium">{item.coordinatorName || 'Coord. não inf.'}</div>}
+                                    {activeTab === 'users' && <div className="text-xs font-black text-brand-600 uppercase">{item.role}</div>}
                                 </td>
                                 <td className="p-4">
                                     {activeTab === 'events' && (
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter border ${item.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
                                             {item.isActive ? 'Ativo' : 'Finalizado'}
                                         </span>
                                     )}
                                     {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-[10px] text-gray-400 italic">Cad. em {formatDate(item.createdAt)}</div>}
-                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="text-xs font-bold text-gray-700">{item.createdBy || 'Sistema'}</div>}
-                                    {activeTab === 'users' && <div className="text-xs text-gray-400">{item.email}</div>}
+                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && (
+                                        <div className="flex items-center gap-2 text-gray-700 font-bold text-xs uppercase">
+                                            <UserCheck size={14} className="text-brand-500" /> {item.createdBy || 'Sistema'}
+                                        </div>
+                                    )}
+                                    {activeTab === 'users' && <div className="text-xs text-gray-400 font-mono">{item.email}</div>}
+                                    {activeTab === 'sectors' && <div className="text-xs text-brand-600 font-bold">{item.coordinatorPhone || '-'}</div>}
                                 </td>
                                 <td className="p-4 text-right space-x-1">
                                     <button 
@@ -355,13 +375,13 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                             setEditingId(item.id);
                                             setIsAdding(true);
                                         }}
-                                        className="p-2 text-gray-400 hover:text-brand-600 transition-colors"
+                                        className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all"
                                     >
                                         <Pencil size={16}/>
                                     </button>
                                     <button 
                                         onClick={() => {
-                                            if (confirm('Excluir permanentemente?')) {
+                                            if (confirm('Deseja realmente excluir este registro?')) {
                                                 if (activeTab === 'events') onDeleteEvent(item.id);
                                                 if (activeTab === 'inventory') {
                                                     if (inventorySubTab === 'ativos') onDeleteEquipment(item.id);
@@ -371,7 +391,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                                 if (activeTab === 'users') onDeleteUser(item.id);
                                             }
                                         }}
-                                        className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                     >
                                         <Trash2 size={16}/>
                                     </button>
@@ -380,7 +400,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                         ))
                     )}
                 </tbody>
-            </table>
+             </table>
         </div>
       </div>
     </div>

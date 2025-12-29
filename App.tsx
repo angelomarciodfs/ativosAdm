@@ -73,12 +73,7 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, categories }: 
                </div>
            );
        }) : (
-           <div className="text-center text-gray-400 text-sm py-10">Cadastre Itens para ver métricas.</div>
-       )}
-       {!currentEvent && (
-           <div className="text-center text-[10px] text-red-400 mt-2 bg-red-50/50 p-1 rounded">
-               * Nenhum evento selecionado.
-           </div>
+           <div className="text-center text-gray-400 text-sm py-10">Cadastre Itens (Categorias) para ver métricas.</div>
        )}
     </div>
   );
@@ -193,11 +188,8 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes('type=recovery')) setIsRecoveryModalOpen(true);
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); if (session?.user) loadAndVerifyUser(session); });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') setIsRecoveryModalOpen(true);
       setSession(session);
       if (session?.user) loadAndVerifyUser(session);
       else setCurrentUser(null);
@@ -212,12 +204,12 @@ const App: React.FC = () => {
       try {
           const loadSafe = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => { try { return await promise; } catch (e) { return fallback; } };
           const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedCats] = await Promise.all([
-              loadSafe(api.fetchEvents(), []),
-              loadSafe(api.fetchEquipment(), []),
-              loadSafe(api.fetchSectors(), []),
-              loadSafe(api.fetchRentals(), []),
-              loadSafe(api.fetchUsers(), []),
-              loadSafe(api.fetchCategories(), [])
+              api.fetchEvents(),
+              api.fetchEquipment(),
+              api.fetchSectors(),
+              api.fetchRentals(),
+              api.fetchUsers(),
+              api.fetchCategories()
           ]);
           setEvents(loadedEvents);
           setEquipmentList(loadedEq);
@@ -225,6 +217,7 @@ const App: React.FC = () => {
           setRentals(loadedRentals);
           setCategories(loadedCats);
           setUsers(loadedUsers);
+          
           const active = loadedEvents.find(e => e.isActive) || loadedEvents[0];
           if (active) setCurrentEventId(active.id);
       } catch (error) { console.error("Fetch Data Error", error); } finally { setIsLoadingData(false); }
@@ -232,6 +225,7 @@ const App: React.FC = () => {
 
   const currentEvent = useMemo(() => events.find(e => e.id === currentEventId) || null, [events, currentEventId]);
   const eventRentals = useMemo(() => currentEventId ? rentals.filter(r => r.eventId === currentEventId) : rentals, [rentals, currentEventId]);
+  
   const stats = useMemo(() => {
     const active = eventRentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
     const totalEquipment = equipmentList.length;
@@ -263,16 +257,16 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (isLoadingData) return <div className="h-full flex items-center justify-center text-brand-600 gap-4"><Loader className="animate-spin" size={32}/> <span className="font-bold">Sincronizando com Banco...</span></div>;
+    if (isLoadingData) return <div className="h-full flex items-center justify-center text-brand-600 gap-4"><Loader className="animate-spin" size={32}/> <span className="font-bold">Sincronizando com Supabase...</span></div>;
     switch (view) {
       case 'dashboard':
         return (
           <div className="space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0">
              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                <div>
-                  <h2 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Dashboard Central</h2>
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Dashboard Central</h2>
                   <p className="text-gray-500 mt-1 text-sm md:text-base">
-                      {currentEvent ? <>Evento Ativo: <span className="text-brand-600 font-bold">{currentEvent.name}</span></> : "Selecione um evento nas configurações."}
+                      {currentEvent ? <>Evento Selecionado: <span className="text-brand-600 font-black">{currentEvent.name}</span></> : "Selecione um evento nas configurações."}
                   </p>
                </div>
             </div>
@@ -284,11 +278,11 @@ const App: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
-                <h3 className="text-sm font-black uppercase text-gray-500 mb-4 flex items-center gap-2 tracking-widest"><Zap size={14} className="text-brand-600" /> Inventário por Tipo (Item)</h3>
+                <h3 className="text-[11px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2 tracking-widest"><Zap size={14} className="text-brand-600" /> Inventário por ITEM</h3>
                 <div className="flex-1 mt-2"><InventoryStatusChart equipment={equipmentList} rentals={eventRentals} currentEvent={currentEvent} categories={categories} /></div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
-                 <h3 className="text-sm font-black uppercase text-gray-500 mb-4 flex items-center gap-2 tracking-widest"><PieChart size={14} className="text-brand-600" /> Alocação por Setor</h3>
+                 <h3 className="text-[11px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2 tracking-widest"><PieChart size={14} className="text-brand-600" /> Alocação por Setor</h3>
                  <div className="flex-1 overflow-hidden h-full"><SectorAllocationChart data={sectorAllocation} /></div>
               </div>
             </div>
