@@ -4,12 +4,16 @@ import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, Categor
 
 // --- HELPERS DE CONVERSÃO ---
 
-const mapCategory = (c: any): Category => ({
-  id: c.id,
-  name: c.name,
-  createdAt: c.created_at,
-  createdBy: c.profiles?.name || 'Sistema'
-});
+const mapCategory = (c: any): Category => {
+  // Supabase pode retornar profiles como objeto ou array dependendo da config da FK
+  const profileData = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
+  return {
+    id: c.id,
+    name: c.name,
+    createdAt: c.created_at,
+    createdBy: profileData?.name || 'Sistema'
+  };
+};
 
 const mapUser = (u: any): User => ({
   id: u.id,
@@ -74,7 +78,7 @@ export const api = {
       .select('*, profiles(name)')
       .order('name');
     if (error) throw error;
-    return data.map(mapCategory);
+    return (data || []).map(mapCategory);
   },
   createCategory: async (name: string, userId: string) => {
     const { data, error } = await supabase
@@ -104,7 +108,7 @@ export const api = {
   fetchEvents: async () => {
     const { data, error } = await supabase.from('events').select('*').order('start_date', { ascending: false });
     if (error) throw error;
-    return data.map(mapEvent);
+    return (data || []).map(mapEvent);
   },
   createEvent: async (event: Omit<Event, 'id'>) => {
     const { data, error } = await supabase.from('events').insert({
@@ -131,7 +135,7 @@ export const api = {
   fetchEquipment: async () => {
     const { data, error } = await supabase.from('equipment').select('*').order('inventory_number', { ascending: true });
     if (error) throw error;
-    return data.map(mapEquipment);
+    return (data || []).map(mapEquipment);
   },
   createEquipment: async (eq: Omit<Equipment, 'id'>) => {
     const { data, error } = await supabase.from('equipment').insert({
@@ -165,7 +169,7 @@ export const api = {
   fetchSectors: async () => {
     const { data, error } = await supabase.from('sectors').select('*').order('name');
     if (error) throw error;
-    return data.map(mapSector);
+    return (data || []).map(mapSector);
   },
   createSector: async (sec: Omit<Sector, 'id'>) => {
     const { data, error } = await supabase.from('sectors').insert({
@@ -194,7 +198,7 @@ export const api = {
   fetchUsers: async () => {
     const { data, error } = await supabase.from('profiles').select('*');
     if (error) throw error;
-    return data.map(mapUser);
+    return (data || []).map(mapUser);
   },
   createProfile: async (user: User) => {
       const { data, error } = await supabase.from('profiles').insert({
@@ -224,7 +228,7 @@ export const api = {
   fetchRentals: async () => {
     const { data, error } = await supabase.from('rentals').select('*').order('created_at', { ascending: false });
     if (error) throw error;
-    return data.map(mapRental);
+    return (data || []).map(mapRental);
   },
   createRental: async (rental: Omit<Rental, 'id' | 'status'>, userId: string) => {
       const { data, error } = await supabase.from('rentals').insert({

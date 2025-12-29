@@ -73,7 +73,7 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, categories }: 
                </div>
            );
        }) : (
-           <div className="text-center text-gray-400 text-sm py-10">Cadastre Itens (Categorias) para ver métricas.</div>
+           <div className="text-center text-gray-400 text-sm py-10">Cadastre Itens para ver métricas.</div>
        )}
     </div>
   );
@@ -202,15 +202,25 @@ const App: React.FC = () => {
   const fetchData = async () => {
       setIsLoadingData(true);
       try {
-          const loadSafe = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => { try { return await promise; } catch (e) { return fallback; } };
+          const loadSafe = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => { 
+              try { 
+                  const result = await promise; 
+                  return result || fallback;
+              } catch (e) { 
+                  console.error("Fetch failure", e);
+                  return fallback; 
+              } 
+          };
+
           const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedCats] = await Promise.all([
-              api.fetchEvents(),
-              api.fetchEquipment(),
-              api.fetchSectors(),
-              api.fetchRentals(),
-              api.fetchUsers(),
-              api.fetchCategories()
+              loadSafe(api.fetchEvents(), []),
+              loadSafe(api.fetchEquipment(), []),
+              loadSafe(api.fetchSectors(), []),
+              loadSafe(api.fetchRentals(), []),
+              loadSafe(api.fetchUsers(), []),
+              loadSafe(api.fetchCategories(), [])
           ]);
+
           setEvents(loadedEvents);
           setEquipmentList(loadedEq);
           setSectors(loadedSectors);
@@ -218,9 +228,13 @@ const App: React.FC = () => {
           setCategories(loadedCats);
           setUsers(loadedUsers);
           
-          const active = loadedEvents.find(e => e.isActive) || loadedEvents[0];
+          const active = loadedEvents.find(e => e.isActive) || (loadedEvents.length > 0 ? loadedEvents[0] : null);
           if (active) setCurrentEventId(active.id);
-      } catch (error) { console.error("Fetch Data Error", error); } finally { setIsLoadingData(false); }
+      } catch (error) { 
+          console.error("General Fetch Data Error", error); 
+      } finally { 
+          setIsLoadingData(false); 
+      }
   };
 
   const currentEvent = useMemo(() => events.find(e => e.id === currentEventId) || null, [events, currentEventId]);
@@ -257,7 +271,7 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (isLoadingData) return <div className="h-full flex items-center justify-center text-brand-600 gap-4"><Loader className="animate-spin" size={32}/> <span className="font-bold">Sincronizando com Supabase...</span></div>;
+    if (isLoadingData) return <div className="h-full flex items-center justify-center text-brand-600 gap-4"><Loader className="animate-spin" size={32}/> <span className="font-bold font-mono tracking-tighter">SINCRONIZANDO COM O SERVIDOR...</span></div>;
     switch (view) {
       case 'dashboard':
         return (
@@ -294,16 +308,31 @@ const App: React.FC = () => {
       case 'new-rental': return <RentalForm onCancel={() => setView('rentals')} onSubmit={handleCreateRental} availableEquipment={equipmentList} sectors={sectors} activeEventId={currentEventId || ''} />;
       case 'settings':
         return <ConfigurationView 
-            equipmentList={equipmentList} onAddEquipment={async (d) => { await api.createEquipment(d); fetchData(); }} onUpdateEquipment={async (d) => { await api.updateEquipment(d); fetchData(); }} onDeleteEquipment={async (id) => { await api.deleteEquipment(id); fetchData(); }}
-            categoryList={categories} onAddCategory={async (n) => { if(currentUser) await api.createCategory(n, currentUser.id); fetchData(); }} onUpdateCategory={async (id, n) => { await api.updateCategory(id, n); fetchData(); }} onDeleteCategory={async (id) => { await api.deleteCategory(id); fetchData(); }}
-            sectorList={sectors} onAddSector={async (d) => { await api.createSector(d); fetchData(); }} onUpdateSector={async (d) => { await api.updateSector(d); fetchData(); }} onDeleteSector={async (id) => { await api.deleteSector(id); fetchData(); }}
-            userList={users} onAddUser={async (d) => { 
+            equipmentList={equipmentList} 
+            onAddEquipment={async (d) => { await api.createEquipment(d); fetchData(); }} 
+            onUpdateEquipment={async (d) => { await api.updateEquipment(d); fetchData(); }} 
+            onDeleteEquipment={async (id) => { await api.deleteEquipment(id); fetchData(); }}
+            categoryList={categories} 
+            onAddCategory={async (n) => { if(currentUser) await api.createCategory(n, currentUser.id); fetchData(); }} 
+            onUpdateCategory={async (id, n) => { await api.updateCategory(id, n); fetchData(); }} 
+            onDeleteCategory={async (id) => { await api.deleteCategory(id); fetchData(); }}
+            sectorList={sectors} 
+            onAddSector={async (d) => { await api.createSector(d); fetchData(); }} 
+            onUpdateSector={async (d) => { await api.updateSector(d); fetchData(); }} 
+            onDeleteSector={async (id) => { await api.deleteSector(id); fetchData(); }}
+            userList={users} 
+            onAddUser={async (d) => { 
                 const tempClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
                 const { data } = await tempClient.auth.signUp({ email: d.email, password: d.password! });
                 if (data.user) await api.createProfile({ id: data.user.id, name: d.name, email: d.email, role: d.role, avatarInitials: d.name.substring(0,2).toUpperCase() });
                 fetchData();
-            }} onUpdateUser={async (d) => { await api.updateProfile(d); fetchData(); }} onDeleteUser={() => {}} 
-            eventList={events} onAddEvent={async (d) => { await api.createEvent(d); fetchData(); }} onUpdateEvent={async (d) => { await api.updateEvent(d); fetchData(); }} onDeleteEvent={() => {}}
+            }} 
+            onUpdateUser={async (d) => { await api.updateProfile(d); fetchData(); }} 
+            onDeleteUser={() => {}} 
+            eventList={events} 
+            onAddEvent={async (d) => { await api.createEvent(d); fetchData(); }} 
+            onUpdateEvent={async (d) => { await api.updateEvent(d); fetchData(); }} 
+            onDeleteEvent={() => {}}
         />;
       default: return <div>View not found</div>;
     }
