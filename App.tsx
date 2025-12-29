@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { StatCard } from './components/StatCard';
@@ -25,8 +24,6 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, categories }: 
       if (categoryName === 'Radio') {
           totalRented = activeRentals.length; 
       } else {
-          // Simplificação: Se não for rádio, contamos as locações ativas que referenciam um equipamento dessa categoria
-          // Idealmente, a locação deveria ter o ID do equipamento diretamente
           totalRented = activeRentals.filter(r => r.radioModel.includes(categoryName)).length;
       }
       
@@ -46,7 +43,7 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, categories }: 
 
   return (
     <div className="flex flex-col justify-center h-full gap-5 px-2">
-       {categories.slice(0, 4).map((cat) => {
+       {categories.length > 0 ? categories.slice(0, 4).map((cat) => {
            const stats = getStats(cat.name);
            const Icon = getIcon(cat.name);
            return (
@@ -74,10 +71,12 @@ const InventoryStatusChart = ({ equipment, rentals, currentEvent, categories }: 
                    </div>
                </div>
            );
-       })}
+       }) : (
+           <div className="text-center text-gray-400 text-sm py-10">Cadastre Itens (Categorias) para ver métricas.</div>
+       )}
        {!currentEvent && (
-           <div className="text-center text-xs text-red-500 mt-2 bg-red-50 p-1 rounded border border-red-100">
-               * Nenhum evento selecionado. Mostrando dados globais.
+           <div className="text-center text-[10px] text-red-400 mt-2 bg-red-50/50 p-1 rounded">
+               * Nenhum evento selecionado.
            </div>
        )}
     </div>
@@ -90,34 +89,16 @@ const SectorAllocationChart = ({ data }: { data: { name: string, count: number }
   if (!data || data.length === 0) {
      return <div className="h-full flex items-center justify-center text-gray-400 text-xs">Sem dados de alocação</div>;
   }
-  
   const total = data.reduce((acc, curr) => acc + curr.count, 0);
-
   return (
     <div className="h-full w-full flex items-center gap-2">
        <div className="w-1/2 h-full relative">
          <ResponsiveContainer width="100%" height="100%">
             <RechartsPieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius={45}
-                outerRadius={65}
-                paddingAngle={4}
-                dataKey="count"
-                stroke="none"
-              >
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
+              <Pie data={data} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="count" stroke="none">
+                {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
               </Pie>
-              <Tooltip 
-                 formatter={(value: number) => [`${value} itens`, 'Qtd']}
-                 contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                 itemStyle={{ color: '#1f2937', fontWeight: 'bold' }}
-                 labelStyle={{ display: 'none' }}
-              />
+              <Tooltip formatter={(value: number) => [`${value} itens`, 'Qtd']} contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
             </RechartsPieChart>
          </ResponsiveContainer>
          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
@@ -125,7 +106,6 @@ const SectorAllocationChart = ({ data }: { data: { name: string, count: number }
             <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Total</div>
          </div>
        </div>
-
        <div className="w-1/2 h-[85%] overflow-y-auto pr-2 custom-scrollbar">
           <div className="flex flex-col gap-2">
             {data.map((item, index) => (
@@ -144,165 +124,36 @@ const SectorAllocationChart = ({ data }: { data: { name: string, count: number }
 };
 
 // --- PASSWORD RECOVERY MODAL ---
-interface PasswordRecoveryModalProps {
-    onClose: () => void;
-}
-
+interface PasswordRecoveryModalProps { onClose: () => void; }
 const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({ onClose }) => {
     const [pass, setPass] = useState('');
     const [confirm, setConfirm] = useState('');
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState('');
     const [isError, setIsError] = useState(false);
-
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setMsg(''); setIsError(false);
-
-        if (pass.length < 6) {
-            setMsg('A senha deve ter no mínimo 6 caracteres.'); setIsError(true); return;
-        }
-        if (pass !== confirm) {
-            setMsg('As senhas não conferem.'); setIsError(true); return;
-        }
-
+        if (pass.length < 6) { setMsg('Mínimo 6 caracteres.'); setIsError(true); return; }
+        if (pass !== confirm) { setMsg('Senhas não conferem.'); setIsError(true); return; }
         setLoading(true);
         try {
             const { error } = await supabase.auth.updateUser({ password: pass });
             if (error) throw error;
-            
-            setMsg('Senha redefinida com sucesso! Redirecionando...');
-            setTimeout(() => {
-                onClose();
-                window.history.replaceState(null, '', window.location.pathname);
-            }, 2000);
-        } catch (e: any) {
-            setMsg(e.message || 'Erro ao redefinir senha.'); setIsError(true);
-        } finally {
-            setLoading(false);
-        }
+            setMsg('Senha redefinida com sucesso!');
+            setTimeout(() => { onClose(); window.history.replaceState(null, '', window.location.pathname); }, 2000);
+        } catch (e: any) { setMsg(e.message || 'Erro ao redefinir.'); setIsError(true); } finally { setLoading(false); }
     };
-
     return (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in-95 border-t-4 border-brand-500">
-                <div className="p-6">
-                    <div className="flex flex-col items-center mb-6 text-center">
-                        <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center text-brand-600 mb-3">
-                            <KeyRound size={24} />
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-900">Redefinição de Senha</h3>
-                        <p className="text-gray-500 text-sm mt-1">Defina uma nova senha para acessar sua conta.</p>
-                    </div>
-                    
-                    <form onSubmit={handleSave} className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-xs text-gray-500 font-semibold">Nova Senha</label>
-                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 focus:border-brand-500 focus:ring-1 focus:ring-brand-500" value={pass} onChange={e => setPass(e.target.value)} placeholder="Mínimo 6 caracteres" />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-xs text-gray-500 font-semibold">Confirmar Senha</label>
-                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 focus:border-brand-500 focus:ring-1 focus:ring-brand-500" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repita a senha" />
-                        </div>
-                        
-                        {msg && (
-                            <div className={`text-xs p-3 rounded-lg text-center font-bold ${isError ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
-                                {msg}
-                            </div>
-                        )}
-
-                        <button type="submit" disabled={loading} className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg flex justify-center items-center gap-2 shadow-lg shadow-brand-500/20 disabled:opacity-70 mt-2">
-                            {loading ? <Loader className="animate-spin" size={18} /> : 'Salvar Nova Senha'}
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- PROFILE MODAL COMPONENT ---
-interface ProfileModalProps {
-    user: User;
-    onClose: () => void;
-    onUpdatePassword: (newPass: string) => Promise<void>;
-}
-
-const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onUpdatePassword }) => {
-    const [pass, setPass] = useState('');
-    const [confirm, setConfirm] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [msg, setMsg] = useState('');
-    const [isError, setIsError] = useState(false);
-
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setMsg(''); setIsError(false);
-
-        if (pass.length < 6) {
-            setMsg('A senha deve ter no mínimo 6 caracteres.'); setIsError(true); return;
-        }
-        if (pass !== confirm) {
-            setMsg('As senhas não conferem.'); setIsError(true); return;
-        }
-
-        setLoading(true);
-        try {
-            await onUpdatePassword(pass);
-            setMsg('Senha atualizada com sucesso!');
-            setPass(''); setConfirm('');
-        } catch (e: any) {
-            setMsg(e.message || 'Erro ao atualizar senha.'); setIsError(true);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in-95">
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                        <UserIcon className="text-brand-600" /> Meu Perfil
-                    </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20} /></button>
-                </div>
-                <div className="p-6">
-                    <div className="mb-6 flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-2xl font-bold border border-brand-200">
-                            {user.avatarInitials}
-                        </div>
-                        <div>
-                            <p className="font-bold text-lg text-gray-900">{user.name}</p>
-                            <p className="text-gray-500 text-sm">{user.email}</p>
-                            <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded border border-brand-100 mt-1 inline-block">
-                                {user.role === 'ADMIN' ? 'Administrador' : 'Operador'}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <form onSubmit={handleSave} className="space-y-4 pt-4 border-t border-gray-100">
-                        <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Alterar Senha</h4>
-                        <div className="space-y-2">
-                            <label className="text-xs text-gray-500 font-semibold">Nova Senha</label>
-                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5" value={pass} onChange={e => setPass(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-xs text-gray-500 font-semibold">Confirmar Senha</label>
-                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5" value={confirm} onChange={e => setConfirm(e.target.value)} />
-                        </div>
-                        
-                        {msg && (
-                            <div className={`text-xs p-2 rounded text-center font-bold ${isError ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                {msg}
-                            </div>
-                        )}
-
-                        <button type="submit" disabled={loading} className="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg flex justify-center items-center gap-2 shadow-lg shadow-brand-500/20 disabled:opacity-70">
-                            {loading ? <Loader className="animate-spin" size={16} /> : <><Lock size={16} /> Atualizar Senha</>}
-                        </button>
-                    </form>
-                </div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 border-t-4 border-brand-500">
+                <div className="text-center mb-6"><h3 className="text-xl font-bold">Nova Senha</h3></div>
+                <form onSubmit={handleSave} className="space-y-4">
+                    <input type="password" required className="w-full bg-gray-50 border p-3 rounded-lg" value={pass} onChange={e => setPass(e.target.value)} placeholder="Nova Senha" />
+                    <input type="password" required className="w-full bg-gray-50 border p-3 rounded-lg" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Confirmar Senha" />
+                    {msg && <div className={`p-3 rounded-lg text-xs font-bold text-center ${isError ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{msg}</div>}
+                    <button type="submit" disabled={loading} className="w-full py-3 bg-brand-500 text-white font-bold rounded-lg">{loading ? <Loader className="animate-spin m-auto"/> : 'Redefinir Senha'}</button>
+                </form>
             </div>
         </div>
     );
@@ -324,57 +175,28 @@ const App: React.FC = () => {
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  
-  const defaultEvent = useMemo(() => events.filter(e => e.isActive).slice(-1)[0] || null, [events]);
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
   
   const loadAndVerifyUser = async (session: any) => {
      if (!session?.user) return;
      try {
-         let allUsers: User[] = [];
-         try {
-             allUsers = await api.fetchUsers();
-         } catch (e) {
-             console.warn("Could not fetch users.");
-         }
+         const allUsers = await api.fetchUsers();
          let profile = allUsers.find(u => u.id === session.user.id);
          if (!profile) {
              const isFirstUser = allUsers.length === 0;
-             const recoveryProfile: User = {
-                id: session.user.id,
-                name: session.user.email?.split('@')[0] || 'Admin',
-                email: session.user.email || '',
-                role: isFirstUser ? 'ADMIN' : 'USER', 
-                avatarInitials: (session.user.email || 'AD').substring(0,2).toUpperCase(),
-                phone: '',
-                preferredName: ''
-             };
-             try {
-                 const created = await api.createProfile(recoveryProfile);
-                 profile = created;
-                 setUsers(prev => [...prev, created]);
-             } catch (err: any) {
-                 profile = { ...recoveryProfile, role: 'ADMIN' }; 
-             }
+             const recoveryProfile: User = { id: session.user.id, name: session.user.email?.split('@')[0] || 'Admin', email: session.user.email || '', role: isFirstUser ? 'ADMIN' : 'USER', avatarInitials: (session.user.email || 'AD').substring(0,2).toUpperCase() };
+             try { profile = await api.createProfile(recoveryProfile); setUsers(prev => [...prev, profile!]); } catch { profile = { ...recoveryProfile, role: 'ADMIN' }; }
          }
          setCurrentUser(profile);
-     } catch (e) {
-         console.error("Error loading user profile", e);
-     }
+     } catch (e) { console.error("Error profile", e); }
   };
 
   useEffect(() => {
     const hash = window.location.hash;
-    const isRecoveryHash = hash && hash.includes('type=recovery');
-    if (isRecoveryHash) setIsRecoveryModalOpen(true);
-
-    (supabase.auth as any).getSession().then(({ data: { session } }: any) => {
-      setSession(session);
-      if (session?.user) loadAndVerifyUser(session);
-    });
-
-    const { data: { subscription } } = (supabase.auth as any).onAuthStateChange(async (event: string, session: any) => {
-      if (event === 'PASSWORD_RECOVERY' || isRecoveryHash) setIsRecoveryModalOpen(true);
+    if (hash.includes('type=recovery')) setIsRecoveryModalOpen(true);
+    supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); if (session?.user) loadAndVerifyUser(session); });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') setIsRecoveryModalOpen(true);
       setSession(session);
       if (session?.user) loadAndVerifyUser(session);
       else setCurrentUser(null);
@@ -382,17 +204,12 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (currentUser) fetchData();
-  }, [currentUser?.id]); 
+  useEffect(() => { if (currentUser) fetchData(); }, [currentUser?.id]); 
 
   const fetchData = async () => {
       setIsLoadingData(true);
       try {
-          const loadSafe = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => {
-              try { return await promise; } catch (e) { console.warn("Data load failed", e); return fallback; }
-          };
-
+          const loadSafe = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => { try { return await promise; } catch (e) { return fallback; } };
           const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedCats] = await Promise.all([
               loadSafe(api.fetchEvents(), []),
               loadSafe(api.fetchEquipment(), []),
@@ -401,191 +218,76 @@ const App: React.FC = () => {
               loadSafe(api.fetchUsers(), []),
               loadSafe(api.fetchCategories(), [])
           ]);
-          
           setEvents(loadedEvents);
           setEquipmentList(loadedEq);
           setSectors(loadedSectors);
           setRentals(loadedRentals);
           setCategories(loadedCats);
-          if(loadedUsers.length > 0) setUsers(loadedUsers);
-          
-          if (currentUser) {
-              const freshProfile = loadedUsers.find(u => u.id === currentUser.id);
-              if (freshProfile && freshProfile.role !== currentUser.role) setCurrentUser(freshProfile);
-          }
-
-          const active = loadedEvents.find(e => e.isActive);
+          setUsers(loadedUsers);
+          const active = loadedEvents.find(e => e.isActive) || loadedEvents[0];
           if (active) setCurrentEventId(active.id);
-          else if (loadedEvents.length > 0) setCurrentEventId(loadedEvents[0].id);
-      } catch (error) {
-          console.error("Erro fatal ao carregar dados.", error);
-      } finally {
-          setIsLoadingData(false);
-      }
+      } catch (error) { console.error("Fetch Data Error", error); } finally { setIsLoadingData(false); }
   };
-
-  useEffect(() => {
-     if (!currentEventId && defaultEvent) setCurrentEventId(defaultEvent.id);
-  }, [defaultEvent, currentEventId]);
 
   const currentEvent = useMemo(() => events.find(e => e.id === currentEventId) || null, [events, currentEventId]);
   const eventRentals = useMemo(() => currentEventId ? rentals.filter(r => r.eventId === currentEventId) : rentals, [rentals, currentEventId]);
-
   const stats = useMemo(() => {
     const active = eventRentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
-    const overdue = eventRentals.filter(r => r.status === RentalStatus.OVERDUE);
-    const partial = eventRentals.filter(r => r.status === RentalStatus.PARTIAL);
-    const completed = eventRentals.filter(r => r.status === RentalStatus.COMPLETED);
     const totalEquipment = equipmentList.length;
-    const utilizationRate = totalEquipment > 0 ? Math.round((active.length / totalEquipment) * 100) : 0;
-    return { totalActive: active.length, totalOverdue: overdue.length, totalPartial: partial.length, totalCompleted: completed.length, utilizationRate, inventorySize: totalEquipment };
+    return {
+      totalActive: active.length,
+      totalOverdue: eventRentals.filter(r => r.status === RentalStatus.OVERDUE).length,
+      totalPartial: eventRentals.filter(r => r.status === RentalStatus.PARTIAL).length,
+      utilizationRate: totalEquipment > 0 ? Math.round((active.length / totalEquipment) * 100) : 0
+    };
   }, [eventRentals, equipmentList]);
 
   const sectorAllocation = useMemo(() => {
     const counts: Record<string, number> = {};
-    const activeRentals = eventRentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
-    activeRentals.forEach(r => {
-      const sectorName = r.clientCompany || 'Outros';
-      counts[sectorName] = (counts[sectorName] || 0) + 1;
-    });
+    eventRentals.filter(r => r.status !== RentalStatus.COMPLETED).forEach(r => { counts[r.clientCompany] = (counts[r.clientCompany] || 0) + 1; });
     return Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [eventRentals]);
 
-  // Handlers
-  const handleLogout = async () => { await (supabase.auth as any).signOut(); setCurrentUser(null); setView('dashboard'); };
-  const handleLogin = async (email: string, pass: string) => {
-     const { error } = await (supabase.auth as any).signInWithPassword({ email, password: pass });
-     if (error) throw error;
-  };
-
   const handleCreateRental = async (data: Omit<Rental, 'id' | 'status'>) => {
     if (!currentUser) return;
-    try {
-        const newRental = await api.createRental(data, currentUser.id);
-        setRentals(prev => [newRental, ...prev]);
-        setView('rentals');
-    } catch (error) {
-        alert("Erro ao salvar locação.");
-    }
+    try { const newRental = await api.createRental(data, currentUser.id); setRentals(prev => [newRental, ...prev]); setView('rentals'); } catch { alert("Erro ao salvar."); }
   };
 
   const handleReturn = async (id: string, returnedItems: RentalAccessories) => {
     const r = rentals.find(item => item.id === id);
     if (!r) return;
     let isComplete = true;
-    if (r.accessories) {
-        (Object.keys(r.accessories) as Array<keyof RentalAccessories>).forEach(key => {
-            if (r.accessories[key] && !returnedItems[key]) isComplete = false;
-        });
-    }
-    const newStatus = isComplete ? RentalStatus.COMPLETED : RentalStatus.PARTIAL;
-    try {
-        const updatedRental = await api.returnRental(id, newStatus, returnedItems);
-        setRentals(prev => prev.map(item => item.id === id ? updatedRental : item));
-    } catch (error) {
-        alert("Erro ao processar devolução.");
-    }
-  };
-
-  // CRUD Equipment
-  const handleAddEquipment = async (d: Omit<Equipment, 'id'>) => {
-      const newItem = await api.createEquipment(d);
-      setEquipmentList(prev => [...prev, newItem]);
-  };
-  const handleUpdateEquipment = async (d: Equipment) => {
-      const updated = await api.updateEquipment(d);
-      setEquipmentList(equipmentList.map(i => i.id === d.id ? updated : i));
-  };
-  const handleDeleteEquipment = async (id: string) => {
-      await api.deleteEquipment(id);
-      setEquipmentList(equipmentList.filter(i => i.id !== id));
-  };
-
-  // CRUD Category
-  const handleAddCategory = async (name: string) => {
-      const newItem = await api.createCategory(name);
-      setCategories(prev => [...prev, newItem]);
-  };
-  const handleUpdateCategory = async (id: string, name: string) => {
-      const updated = await api.updateCategory(id, name);
-      setCategories(categories.map(c => c.id === id ? updated : c));
-  };
-  const handleDeleteCategory = async (id: string) => {
-      await api.deleteCategory(id);
-      setCategories(categories.filter(c => c.id !== id));
-  };
-
-  // CRUD Sector
-  const handleAddSector = async (d: Omit<Sector, 'id'>) => {
-      const newItem = await api.createSector(d);
-      setSectors(prev => [...prev, newItem]);
-  };
-  const handleUpdateSector = async (d: Sector) => {
-      const updated = await api.updateSector(d);
-      setSectors(sectors.map(i => i.id === d.id ? updated : i));
-  };
-  const handleDeleteSector = async (id: string) => {
-      await api.deleteSector(id);
-      setSectors(sectors.filter(i => i.id !== id));
-  };
-
-  // CRUD Users
-  const handleAddUser = async (d: Omit<User, 'id' | 'avatarInitials'> & { password?: string }) => {
-      if (!d.password) return;
-      try {
-          const tempClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
-          const { data: authData, error: authError } = await (tempClient.auth as any).signUp({ email: d.email, password: d.password });
-          if (authError) throw authError;
-          const newUser: User = { id: authData.user.id, name: d.name, email: d.email, role: d.role, phone: d.phone, preferredName: d.preferredName, avatarInitials: d.name.substring(0, 2).toUpperCase() };
-          const createdProfile = await api.createProfile(newUser);
-          setUsers(prev => [...prev, createdProfile]);
-      } catch (error: any) { alert(`Erro: ${error.message}`); }
-  };
-  const handleUpdateUser = async (d: User) => {
-      const updated = await api.updateProfile(d);
-      setUsers(users.map(u => u.id === d.id ? updated : u));
-  };
-
-  // CRUD Events
-  const handleAddEvent = async (d: Omit<Event, 'id'>) => {
-      const newItem = await api.createEvent(d);
-      setEvents(prev => [...prev, newItem]);
-      if(newItem.isActive) setCurrentEventId(newItem.id);
-  };
-  const handleUpdateEvent = async (d: Event) => {
-      const updated = await api.updateEvent(d);
-      setEvents(events.map(i => i.id === d.id ? updated : i));
+    if (r.accessories) { Object.keys(r.accessories).forEach((key: any) => { if (r.accessories[key as keyof RentalAccessories] && !returnedItems[key as keyof RentalAccessories]) isComplete = false; }); }
+    try { const updated = await api.returnRental(id, isComplete ? RentalStatus.COMPLETED : RentalStatus.PARTIAL, returnedItems); setRentals(prev => prev.map(item => item.id === id ? updated : item)); } catch { alert("Erro na devolução."); }
   };
 
   const renderContent = () => {
-    if (isLoadingData) return <div className="h-full flex items-center justify-center text-gray-400 gap-2"><Loader className="animate-spin"/> Carregando...</div>;
+    if (isLoadingData) return <div className="h-full flex items-center justify-center text-brand-600 gap-4"><Loader className="animate-spin" size={32}/> <span className="font-bold">Sincronizando com Banco...</span></div>;
     switch (view) {
       case 'dashboard':
         return (
           <div className="space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0">
              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                <div>
-                  <h2 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h2>
+                  <h2 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Dashboard Central</h2>
                   <p className="text-gray-500 mt-1 text-sm md:text-base">
-                      {currentEvent ? <>Evento: <span className="text-brand-600 font-bold">{currentEvent.name}</span></> : "Selecione um evento"}
+                      {currentEvent ? <>Evento Ativo: <span className="text-brand-600 font-bold">{currentEvent.name}</span></> : "Selecione um evento nas configurações."}
                   </p>
                </div>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
               <StatCard title="Em Uso" value={stats.totalActive} icon={<Radio size={20} />} color="brand" />
-              <StatCard title="Atrasos" value={stats.totalOverdue} icon={<AlertTriangle size={20} />} color="red" trend={stats.totalOverdue > 0 ? "!" : ""} trendUp={false} />
+              <StatCard title="Atrasos" value={stats.totalOverdue} icon={<AlertTriangle size={20} />} color="red" />
               <StatCard title="Parciais" value={stats.totalPartial} icon={<CheckCircle size={20} />} color="blue" />
-              <StatCard title="% Uso" value={`${stats.utilizationRate}%`} icon={<Activity size={20} />} color={stats.utilizationRate > 80 ? 'red' : 'green'} />
+              <StatCard title="% Utilização" value={`${stats.utilizationRate}%`} icon={<Activity size={20} />} color="green" />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
-                <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2"><Zap size={18} className="text-brand-600" /> Inventário por Categoria</h3>
-                <div className="flex-1 mt-2">
-                   <InventoryStatusChart equipment={equipmentList} rentals={eventRentals} currentEvent={currentEvent} categories={categories} />
-                </div>
+                <h3 className="text-sm font-black uppercase text-gray-500 mb-4 flex items-center gap-2 tracking-widest"><Zap size={14} className="text-brand-600" /> Inventário por Tipo (Item)</h3>
+                <div className="flex-1 mt-2"><InventoryStatusChart equipment={equipmentList} rentals={eventRentals} currentEvent={currentEvent} categories={categories} /></div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
-                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2"><PieChart size={18} className="text-brand-600" /> Alocação por Setor</h3>
+                 <h3 className="text-sm font-black uppercase text-gray-500 mb-4 flex items-center gap-2 tracking-widest"><PieChart size={14} className="text-brand-600" /> Alocação por Setor</h3>
                  <div className="flex-1 overflow-hidden h-full"><SectorAllocationChart data={sectorAllocation} /></div>
               </div>
             </div>
@@ -597,23 +299,27 @@ const App: React.FC = () => {
       case 'new-rental': return <RentalForm onCancel={() => setView('rentals')} onSubmit={handleCreateRental} availableEquipment={equipmentList} sectors={sectors} activeEventId={currentEventId || ''} />;
       case 'settings':
         return <ConfigurationView 
-            equipmentList={equipmentList} onAddEquipment={handleAddEquipment} onUpdateEquipment={handleUpdateEquipment} onDeleteEquipment={handleDeleteEquipment}
-            categoryList={categories} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory}
-            sectorList={sectors} onAddSector={handleAddSector} onUpdateSector={handleUpdateSector} onDeleteSector={handleDeleteSector}
-            userList={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={() => {}} 
-            eventList={events} onAddEvent={handleAddEvent} onUpdateEvent={handleUpdateEvent} onDeleteEvent={() => {}}
+            equipmentList={equipmentList} onAddEquipment={async (d) => { await api.createEquipment(d); fetchData(); }} onUpdateEquipment={async (d) => { await api.updateEquipment(d); fetchData(); }} onDeleteEquipment={async (id) => { await api.deleteEquipment(id); fetchData(); }}
+            categoryList={categories} onAddCategory={async (n) => { await api.createCategory(n); fetchData(); }} onUpdateCategory={async (id, n) => { await api.updateCategory(id, n); fetchData(); }} onDeleteCategory={async (id) => { await api.deleteCategory(id); fetchData(); }}
+            sectorList={sectors} onAddSector={async (d) => { await api.createSector(d); fetchData(); }} onUpdateSector={async (d) => { await api.updateSector(d); fetchData(); }} onDeleteSector={async (id) => { await api.deleteSector(id); fetchData(); }}
+            userList={users} onAddUser={async (d) => { 
+                const tempClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+                const { data } = await tempClient.auth.signUp({ email: d.email, password: d.password! });
+                if (data.user) await api.createProfile({ id: data.user.id, name: d.name, email: d.email, role: d.role, avatarInitials: d.name.substring(0,2).toUpperCase() });
+                fetchData();
+            }} onUpdateUser={async (d) => { await api.updateProfile(d); fetchData(); }} onDeleteUser={() => {}} 
+            eventList={events} onAddEvent={async (d) => { await api.createEvent(d); fetchData(); }} onUpdateEvent={async (d) => { await api.updateEvent(d); fetchData(); }} onDeleteEvent={() => {}}
         />;
       default: return <div>View not found</div>;
     }
   };
 
-  if (!currentUser) return <><LoginScreen onLogin={handleLogin} />{isRecoveryModalOpen && <PasswordRecoveryModal onClose={() => { setIsRecoveryModalOpen(false); handleLogout(); }} />}</>;
+  if (!currentUser) return <LoginScreen onLogin={async (e, p) => { const { error } = await supabase.auth.signInWithPassword({ email: e, password: p }); if (error) throw error; }} />;
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans flex-col md:flex-row">
-      <Sidebar currentView={view} onChangeView={setView} currentUser={currentUser} onLogout={handleLogout} onProfileClick={() => setIsProfileModalOpen(true)} currentEvent={currentEvent} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <Sidebar currentView={view} onChangeView={setView} currentUser={currentUser} onLogout={() => supabase.auth.signOut()} onProfileClick={() => setIsProfileModalOpen(true)} currentEvent={currentEvent} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen"><div className="max-w-7xl mx-auto">{renderContent()}</div></main>
-      {isProfileModalOpen && currentUser && <ProfileModal user={currentUser} onClose={() => setIsProfileModalOpen(false)} onUpdatePassword={async (p) => { await (supabase.auth as any).updateUser({ password: p }); }} />}
       {isRecoveryModalOpen && <PasswordRecoveryModal onClose={() => setIsRecoveryModalOpen(false)} />}
     </div>
   );
