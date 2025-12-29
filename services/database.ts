@@ -5,6 +5,7 @@ import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, Equipme
 // --- HELPERS DE CONVERSÃO ---
 
 const mapItem = (c: any): EquipmentItem => {
+  // Tenta extrair o nome do perfil, lidando com diferentes formatos de retorno do Supabase
   const profileData = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
   return {
     id: c.id,
@@ -72,20 +73,42 @@ const mapRental = (r: any): Rental => ({
 export const api = {
   // ITEMS (EQUIPMENT CATEGORIES)
   fetchItems: async () => {
-    const { data, error } = await supabase
-      .from('equipment_categories')
-      .select('*, profiles(name)')
-      .order('name');
-    if (error) throw error;
-    return (data || []).map(mapItem);
+    try {
+      const { data, error } = await supabase
+        .from('equipment_categories')
+        .select(`
+          id, 
+          name, 
+          created_at, 
+          created_by,
+          profiles (name)
+        `)
+        .order('name');
+      
+      if (error) {
+        console.error("Erro ao buscar itens do inventário:", error);
+        throw error;
+      }
+      return (data || []).map(mapItem);
+    } catch (err) {
+      console.error("Falha na API fetchItems:", err);
+      return [];
+    }
   },
   createItem: async (name: string, userId: string) => {
     const { data, error } = await supabase
       .from('equipment_categories')
-      .insert({ name, created_by: userId })
+      .insert({ 
+        name: name, 
+        created_by: userId 
+      })
       .select('*, profiles(name)')
       .single();
-    if (error) throw error;
+      
+    if (error) {
+      console.error("Erro ao gravar novo item:", error);
+      throw error;
+    }
     return mapItem(data);
   },
   updateItem: async (id: string, name: string) => {

@@ -188,7 +188,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                         <div className="space-y-1">
                             <label className="text-xs uppercase text-gray-500 font-bold flex justify-between items-center mb-1">
                                 ITEM (Tipo de Ativo)
-                                <button type="button" onClick={() => { setInventorySubTab('itens'); setIsAdding(true); setEditingId(null); }} className="text-brand-600 hover:text-brand-700 text-[9px] font-black border border-brand-200 px-1.5 rounded bg-brand-50">CADASTRAR NOVO ITEM +</button>
+                                <button type="button" onClick={() => { setInventorySubTab('itens'); setIsAdding(true); setEditingId(null); }} className="text-brand-600 hover:text-brand-700 text-[9px] font-black border border-brand-200 px-1.5 rounded bg-brand-50 uppercase">NOVO ITEM +</button>
                             </label>
                             <select required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.category} onChange={e => setEqFormData({...eqFormData, category: e.target.value})}>
                                 <option value="">Selecione...</option>
@@ -217,7 +217,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                 {activeTab === 'inventory' && inventorySubTab === 'itens' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do ITEM (Ex: Lanterna de Cabeça)</label>
+                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do ITEM (Ex: Lanterna, Rádio)</label>
                             <input required type="text" placeholder="Digite o nome..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" value={itemFormData.name} onChange={e => setItemFormData({name: e.target.value})} />
                         </div>
                     </div>
