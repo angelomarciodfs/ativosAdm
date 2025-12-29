@@ -1,27 +1,29 @@
+
 import { createClient } from '@supabase/supabase-js';
 
-// Acesso seguro: se import.meta.env for undefined, usa objeto vazio para não quebrar o app
-const envUrl = import.meta.env?.VITE_SUPABASE_URL;
-const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
-
-// Credenciais fornecidas (Fallback)
+// Fallback seguro para as chaves
 const DEFAULT_URL = 'https://nrgfcvnsfovmdcyulhjd.supabase.co';
 const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZ2Zjdm5zZm92bWRjeXVsaGpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1MTEzMDYsImV4cCI6MjA4MTA4NzMwNn0.d3O8xiCdNmbeaqJuywrTrWomYpSsP-1fjGNQkw_9S-8';
 
-// Validação básica
-const isValidUrl = (url: string | undefined): boolean => {
-  try {
-    return !!url && (url.startsWith('http://') || url.startsWith('https://'));
-  } catch (e) {
-    return false;
-  }
-};
+// Exporting supabaseUrl and supabaseKey to fix import errors in App.tsx
+export let supabaseUrl = DEFAULT_URL;
+export let supabaseKey = DEFAULT_KEY;
 
-// Lógica de fallback: Usa variável de ambiente se válida, senão usa a chave fornecida
-export const supabaseUrl = (envUrl && isValidUrl(envUrl)) ? envUrl : DEFAULT_URL;
-export const supabaseKey = envKey || DEFAULT_KEY;
+// Tenta obter das variáveis de ambiente se disponível
+try {
+  // @ts-ignore - Evita erro de tipagem se a env não estiver definida
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    // @ts-ignore
+    const envUrl = import.meta.env.VITE_SUPABASE_URL;
+    // @ts-ignore
+    const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (envUrl && envUrl.startsWith('http')) supabaseUrl = envUrl;
+    if (envKey) supabaseKey = envKey;
+  }
+} catch (e) {
+  console.warn("Ambiente de variáveis não detectado, usando chaves padrão.");
+}
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Consideramos configurado se tivermos as credenciais padrão ou de ambiente
 export const isConfigured = !!supabaseUrl && !!supabaseKey;

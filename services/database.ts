@@ -4,14 +4,12 @@ import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, Equipme
 
 // --- HELPERS DE CONVERSÃO ---
 
-const mapItem = (c: any): EquipmentItem => {
-  return {
-    id: c.id,
-    name: c.name,
-    createdAt: c.created_at,
-    createdBy: c.created_by // Agora mapeia o ID do criador (texto ou uuid)
-  };
-};
+const mapItem = (c: any): EquipmentItem => ({
+  id: c.id,
+  name: c.name,
+  createdAt: c.created_at,
+  createdBy: c.created_by
+});
 
 const mapUser = (u: any): User => ({
   id: u.id,
@@ -27,7 +25,6 @@ const mapSector = (s: any): Sector => ({
   id: s.id,
   name: s.name,
   coordinatorName: s.coordinator_name,
-  // Fix: changed coordinator_phone to coordinatorPhone to match Sector interface
   coordinatorPhone: s.coordinator_phone
 });
 
@@ -55,7 +52,6 @@ const mapRental = (r: any): Rental => ({
   clientName: r.client_name,
   clientPhone: r.client_phone,
   clientCompany: r.client_company,
-  // Fix: changed property names from snake_case to camelCase to match Rental interface
   radioModel: r.radio_model,
   serialNumber: r.serial_number,
   startDate: r.start_date,
@@ -71,10 +67,8 @@ const mapRental = (r: any): Rental => ({
 // --- API METHODS ---
 
 export const api = {
-  // ITEMS (EQUIPMENT CATEGORIES)
   fetchItems: async () => {
     try {
-      // Buscamos todas as colunas necessárias. Se RLS estiver OK, os dados aparecerão.
       const { data, error } = await supabase
         .from('equipment_categories')
         .select('id, name, created_at, created_by')
@@ -97,10 +91,7 @@ export const api = {
       .select('id, name, created_at, created_by')
       .single();
       
-    if (error) {
-      console.error("Erro ao gravar novo item:", error);
-      throw error;
-    }
+    if (error) throw error;
     return mapItem(data);
   },
   updateItem: async (id: string, name: string) => {
@@ -118,7 +109,6 @@ export const api = {
     if (error) throw error;
   },
 
-  // EVENTS
   fetchEvents: async () => {
     const { data, error } = await supabase.from('events').select('*').order('start_date', { ascending: false });
     if (error) throw error;
@@ -145,7 +135,6 @@ export const api = {
     return mapEvent(data);
   },
 
-  // EQUIPMENT
   fetchEquipment: async () => {
     const { data, error } = await supabase.from('equipment').select('*').order('inventory_number', { ascending: true });
     if (error) throw error;
@@ -179,7 +168,6 @@ export const api = {
     if (error) throw error;
   },
 
-  // SECTORS
   fetchSectors: async () => {
     const { data, error } = await supabase.from('sectors').select('*').order('name');
     if (error) throw error;
@@ -208,7 +196,6 @@ export const api = {
     if (error) throw error;
   },
 
-  // USERS
   fetchUsers: async () => {
     const { data, error } = await supabase.from('profiles').select('*');
     if (error) throw error;
@@ -238,7 +225,6 @@ export const api = {
       return mapUser(data);
   },
 
-  // RENTALS
   fetchRentals: async () => {
     const { data, error } = await supabase.from('rentals').select('*').order('created_at', { ascending: false });
     if (error) throw error;
