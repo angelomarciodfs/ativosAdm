@@ -211,7 +211,8 @@ export const api = {
         name: sec.name,
         coordinator_name: sec.coordinatorName,
         coordinator_phone: sec.coordinatorPhone,
-        channel_id: sec.channelId
+        // Converte string vazia para null para evitar erro de UUID inválido
+        channel_id: sec.channelId || null 
     }).select().single();
     if (error) throw error;
     return mapSector(data);
@@ -221,7 +222,8 @@ export const api = {
         name: sec.name,
         coordinator_name: sec.coordinatorName,
         coordinator_phone: sec.coordinatorPhone,
-        channel_id: sec.channelId
+        // Converte string vazia para null para evitar erro de UUID inválido
+        channel_id: sec.channelId || null
     }).eq('id', sec.id).select().single();
     if (error) throw error;
     return mapSector(data);

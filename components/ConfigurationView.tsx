@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Equipment, Sector, User, UserRole, Event, EquipmentItem, Channel } from '../types';
-import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key, Radio as RadioIcon, Activity } from 'lucide-react';
+import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key, Radio as RadioIcon, Activity, Phone } from 'lucide-react';
 
 interface ConfigurationViewProps {
   equipmentList: Equipment[];
@@ -57,8 +57,9 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
 
   const maskChannel = (val: string) => {
       let clean = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-      if (clean.length > 2) {
-          return clean.substring(0, 2) + '-' + clean.substring(2, 4);
+      // Formato TOP-01 (3 letras - 2 números)
+      if (clean.length > 3) {
+          return clean.substring(0, 3) + '-' + clean.substring(3, 5);
       }
       return clean;
   };
@@ -135,10 +136,9 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
       return user ? user.name : userIdOrName;
   };
 
-  const resolveChannelName = (channelId?: string) => {
-      if (!channelId) return '-';
-      const ch = channelList.find(c => c.id === channelId);
-      return ch ? `${ch.name} (${ch.frequency})` : '-';
+  const resolveChannelInfo = (channelId?: string) => {
+      if (!channelId) return null;
+      return channelList.find(c => c.id === channelId);
   };
 
   return (
@@ -207,7 +207,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1">
                             <label className="text-xs uppercase text-gray-500 font-bold">Nome do Canal</label>
-                            <input required type="text" placeholder="Ex: UV-01" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono" value={channelFormData.name} onChange={e => setChannelFormData({...channelFormData, name: maskChannel(e.target.value)})} maxLength={5} />
+                            <input required type="text" placeholder="Ex: TOP-01" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono" value={channelFormData.name} onChange={e => setChannelFormData({...channelFormData, name: maskChannel(e.target.value)})} maxLength={6} />
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs uppercase text-gray-500 font-bold">Frequência</label>
@@ -247,7 +247,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                     </div>
                 )}
                 
-                {/* Outros cases mantidos conforme original... */}
                 {activeTab === 'events' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2 space-y-1">
@@ -367,9 +366,12 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
              <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black">
-                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : 'Patrimônio / ID'}</th>
-                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : 'NOME / INFO'}</th>
-                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado por' : 'Status / Vínculo'}</th>
+                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : (activeTab === 'sectors' ? 'Sigla' : 'Patrimônio / ID')}</th>
+                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : (activeTab === 'sectors' ? 'Coordenador / WhatsApp' : 'NOME / INFO')}</th>
+                        <th className="p-4">
+                            {activeTab === 'sectors' ? 'Canal Operacional' : 
+                             (activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado por' : 'Status / Vínculo')}
+                        </th>
                         <th className="p-4 text-right">Ações</th>
                     </tr>
                 </thead>
@@ -377,79 +379,96 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                     {filteredData().length === 0 ? (
                         <tr><td colSpan={4} className="p-16 text-center text-gray-400 italic font-medium">Nenhum registro encontrado.</td></tr>
                     ) : (
-                        filteredData().map((item: any) => (
-                            <tr key={item.id} className="hover:bg-brand-50/20 transition-colors group">
-                                <td className="p-4">
-                                    {activeTab === 'events' && <div className="font-bold text-gray-900">{item.name}</div>}
-                                    {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
-                                        <span className="font-mono text-brand-600 font-black text-sm">{item.inventoryNumber}</span>
-                                    )}
-                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && <span className="font-bold text-gray-900">{item.name}</span>}
-                                    {activeTab === 'sectors' && <div className="font-black text-gray-900 tracking-tighter">{item.name}</div>}
-                                    {activeTab === 'channels' && <div className="font-black text-gray-900 font-mono">{item.name}</div>}
-                                    {activeTab === 'users' && <div className="font-bold text-gray-900 text-sm">{item.name}</div>}
-                                </td>
-                                <td className="p-4 text-sm">
-                                    {activeTab === 'events' && <div className="text-gray-600 font-medium">{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>}
-                                    {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-xs text-gray-500 uppercase font-bold">{item.category} | {item.brand} {item.model}</div>}
-                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="text-gray-500 font-mono text-xs"><Clock size={12} className="inline mr-1"/> {formatDate(item.createdAt)}</div>}
-                                    {activeTab === 'sectors' && <div className="text-xs text-gray-500">{item.coordinatorName || '-'}</div>}
-                                    {activeTab === 'channels' && <div className="text-xs font-bold text-brand-600">{item.frequency} MHz</div>}
-                                    {activeTab === 'users' && <div className="text-xs font-black text-brand-600 uppercase">{item.role}</div>}
-                                </td>
-                                <td className="p-4">
-                                    {activeTab === 'events' && (
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
-                                            {item.isActive ? 'Ativo' : 'Finalizado'}
-                                        </span>
-                                    )}
-                                    {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-[10px] text-gray-400 italic">Cad. em {formatDate(item.createdAt)}</div>}
-                                    {activeTab === 'inventory' && inventorySubTab === 'itens' && (
-                                        <div className="flex items-center gap-2 text-gray-700 font-bold text-xs uppercase">
-                                            <UserCheck size={14} className="text-brand-500" /> {resolveCreatorName(item.createdBy)}
-                                        </div>
-                                    )}
-                                    {activeTab === 'users' && <div className="text-xs text-gray-400 font-mono">{item.email}</div>}
-                                    {activeTab === 'channels' && <div className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{item.type}</div>}
-                                    {activeTab === 'sectors' && (
-                                        <div className="flex items-center gap-2">
-                                            <RadioIcon size={14} className="text-brand-500" />
-                                            <span className="text-xs text-brand-600 font-bold">{resolveChannelName(item.channelId)}</span>
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="p-4 text-right space-x-1">
-                                    <button 
-                                        onClick={() => {
-                                            if (activeTab === 'events') setEventFormData({name: item.name, startDate: item.startDate, endDate: item.endDate, isActive: item.isActive});
-                                            if (activeTab === 'inventory' && inventorySubTab === 'ativos') setEqFormData({inventoryNumber: item.inventoryNumber, brand: item.brand, model: item.model, category: item.category});
-                                            if (activeTab === 'inventory' && inventorySubTab === 'itens') setItemFormData({name: item.name});
-                                            if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || '', channelId: item.channelId || ''});
-                                            if (activeTab === 'channels') setChannelFormData({name: item.name, frequency: item.frequency, type: item.type});
-                                            if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: ''});
-                                            setEditingId(item.id);
-                                            setIsAdding(true);
-                                        }}
-                                        className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all"
-                                    ><Pencil size={16}/></button>
-                                    <button 
-                                        onClick={() => {
-                                            if (confirm('Deseja excluir permanentemente?')) {
-                                                if (activeTab === 'events') onDeleteEvent(item.id);
-                                                if (activeTab === 'inventory') {
-                                                    if (inventorySubTab === 'ativos') onDeleteEquipment(item.id);
-                                                    else onDeleteItem(item.id);
+                        filteredData().map((item: any) => {
+                            const channelInfo = activeTab === 'sectors' ? resolveChannelInfo(item.channelId) : null;
+                            return (
+                                <tr key={item.id} className="hover:bg-brand-50/20 transition-colors group">
+                                    <td className="p-4">
+                                        {activeTab === 'events' && <div className="font-bold text-gray-900">{item.name}</div>}
+                                        {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
+                                            <span className="font-mono text-brand-600 font-black text-sm">{item.inventoryNumber}</span>
+                                        )}
+                                        {activeTab === 'inventory' && inventorySubTab === 'itens' && <span className="font-bold text-gray-900">{item.name}</span>}
+                                        {activeTab === 'sectors' && <div className="font-black text-gray-900 tracking-tighter text-base">{item.name}</div>}
+                                        {activeTab === 'channels' && <div className="font-black text-gray-900 font-mono">{item.name}</div>}
+                                        {activeTab === 'users' && <div className="font-bold text-gray-900 text-sm">{item.name}</div>}
+                                    </td>
+                                    <td className="p-4 text-sm">
+                                        {activeTab === 'events' && <div className="text-gray-600 font-medium">{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>}
+                                        {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-xs text-gray-500 uppercase font-bold">{item.category} | {item.brand} {item.model}</div>}
+                                        {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="text-gray-500 font-mono text-xs"><Clock size={12} className="inline mr-1"/> {formatDate(item.createdAt)}</div>}
+                                        {activeTab === 'sectors' && (
+                                            <div className="space-y-1">
+                                                <div className="font-bold text-gray-800">{item.coordinatorName || '-'}</div>
+                                                <div className="flex items-center gap-1.5 text-xs text-brand-600 font-bold">
+                                                    <Phone size={12} /> {item.coordinatorPhone || '-'}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {activeTab === 'channels' && <div className="text-xs font-bold text-brand-600">{item.frequency} MHz</div>}
+                                        {activeTab === 'users' && <div className="text-xs font-black text-brand-600 uppercase">{item.role}</div>}
+                                    </td>
+                                    <td className="p-4">
+                                        {activeTab === 'events' && (
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                                                {item.isActive ? 'Ativo' : 'Finalizado'}
+                                            </span>
+                                        )}
+                                        {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-[10px] text-gray-400 italic">Cad. em {formatDate(item.createdAt)}</div>}
+                                        {activeTab === 'inventory' && inventorySubTab === 'itens' && (
+                                            <div className="flex items-center gap-2 text-gray-700 font-bold text-xs uppercase">
+                                                <UserCheck size={14} className="text-brand-500" /> {resolveCreatorName(item.createdBy)}
+                                            </div>
+                                        )}
+                                        {activeTab === 'users' && <div className="text-xs text-gray-400 font-mono">{item.email}</div>}
+                                        {activeTab === 'channels' && <div className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{item.type}</div>}
+                                        {activeTab === 'sectors' && (
+                                            channelInfo ? (
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <RadioIcon size={14} className="text-brand-500" />
+                                                        <span className="text-sm text-brand-600 font-black font-mono">{channelInfo.name}</span>
+                                                    </div>
+                                                    <div className="text-[10px] text-gray-400 uppercase font-bold pl-5">
+                                                        {channelInfo.frequency} MHz ({channelInfo.type})
+                                                    </div>
+                                                </div>
+                                            ) : <span className="text-xs text-gray-300 italic">Não vinculado</span>
+                                        )}
+                                    </td>
+                                    <td className="p-4 text-right space-x-1">
+                                        <button 
+                                            onClick={() => {
+                                                if (activeTab === 'events') setEventFormData({name: item.name, startDate: item.startDate, endDate: item.endDate, isActive: item.isActive});
+                                                if (activeTab === 'inventory' && inventorySubTab === 'ativos') setEqFormData({inventoryNumber: item.inventoryNumber, brand: item.brand, model: item.model, category: item.category});
+                                                if (activeTab === 'inventory' && inventorySubTab === 'itens') setItemFormData({name: item.name});
+                                                if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || '', channelId: item.channelId || ''});
+                                                if (activeTab === 'channels') setChannelFormData({name: item.name, frequency: item.frequency, type: item.type});
+                                                if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: ''});
+                                                setEditingId(item.id);
+                                                setIsAdding(true);
+                                            }}
+                                            className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all"
+                                        ><Pencil size={16}/></button>
+                                        <button 
+                                            onClick={() => {
+                                                if (confirm('Deseja excluir permanentemente?')) {
+                                                    if (activeTab === 'events') onDeleteEvent(item.id);
+                                                    if (activeTab === 'inventory') {
+                                                        if (inventorySubTab === 'ativos') onDeleteEquipment(item.id);
+                                                        else onDeleteItem(item.id);
+                                                    }
+                                                    if (activeTab === 'sectors') onDeleteSector(item.id);
+                                                    if (activeTab === 'channels') onDeleteChannel(item.id);
+                                                    if (activeTab === 'users') onDeleteUser(item.id);
                                                 }
-                                                if (activeTab === 'sectors') onDeleteSector(item.id);
-                                                if (activeTab === 'channels') onDeleteChannel(item.id);
-                                                if (activeTab === 'users') onDeleteUser(item.id);
-                                            }
-                                        }}
-                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                    ><Trash2 size={16}/></button>
-                                </td>
-                            </tr>
-                        ))
+                                            }}
+                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                        ><Trash2 size={16}/></button>
+                                    </td>
+                                </tr>
+                            );
+                        })
                     )}
                 </tbody>
              </table>
