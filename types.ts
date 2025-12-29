@@ -7,16 +7,19 @@ export enum RentalStatus {
   PARTIAL = 'Parcial / Pendente'
 }
 
-export type EquipmentCategory = 'Radio' | 'Headset' | 'PowerBank';
+export interface Category {
+  id: string;
+  name: string;
+}
 
 export interface Equipment {
   id: string;
-  inventoryNumber: string; // Ex: ADM 01, VEO 02 (Etiqueta física)
-  name: string; // Identificação interna (ex: Rádio 01)
+  inventoryNumber: string; 
+  name: string; 
   brand: string;
   model: string;
-  category: EquipmentCategory;
-  createdAt: string; // ISO Date
+  category: string; // Agora é uma string dinâmica (nome da categoria)
+  createdAt: string; 
 }
 
 export interface Sector {
@@ -28,10 +31,10 @@ export interface Sector {
 
 export interface Event {
   id: string;
-  name: string; // Ex: TOP 1109 - Edição 54
+  name: string; 
   startDate: string;
   endDate: string;
-  isActive: boolean; // Se é o evento corrente
+  isActive: boolean; 
 }
 
 export interface RentalAccessories {
@@ -44,10 +47,10 @@ export interface RentalAccessories {
 
 export interface Rental {
   id: string;
-  eventId: string; // Vínculo com o evento
+  eventId: string; 
   clientName: string;
   clientPhone: string; 
-  clientCompany: string; // Setor (Segurança, Mídia, etc)
+  clientCompany: string; 
   radioModel: string;
   serialNumber: string;
   startDate: string; 
@@ -58,7 +61,7 @@ export interface Rental {
   registeredBy?: string; 
   dailyRate?: number;
   accessories: RentalAccessories;
-  returnedAccessories?: RentalAccessories; // O que efetivamente voltou
+  returnedAccessories?: RentalAccessories; 
 }
 
 export interface DashboardStats {

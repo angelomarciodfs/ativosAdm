@@ -1,10 +1,14 @@
 
 import { supabase } from './supabaseClient';
-import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, EquipmentCategory } from '../types';
+import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, Category } from '../types';
 
 // --- HELPERS DE CONVERSÃO ---
 
-// Converte User do DB para App
+const mapCategory = (c: any): Category => ({
+  id: c.id,
+  name: c.name
+});
+
 const mapUser = (u: any): User => ({
   id: u.id,
   name: u.name,
@@ -15,7 +19,6 @@ const mapUser = (u: any): User => ({
   phone: u.phone
 });
 
-// Converte Sector do DB para App
 const mapSector = (s: any): Sector => ({
   id: s.id,
   name: s.name,
@@ -23,7 +26,6 @@ const mapSector = (s: any): Sector => ({
   coordinatorPhone: s.coordinator_phone
 });
 
-// Converte Event do DB para App
 const mapEvent = (e: any): Event => ({
   id: e.id,
   name: e.name,
@@ -32,18 +34,16 @@ const mapEvent = (e: any): Event => ({
   isActive: e.is_active
 });
 
-// Converte Equipment do DB para App
 const mapEquipment = (e: any): Equipment => ({
   id: e.id,
   inventoryNumber: e.inventory_number,
   name: e.name,
   brand: e.brand,
   model: e.model,
-  category: e.category as EquipmentCategory,
+  category: e.category,
   createdAt: e.created_at
 });
 
-// Converte Rental do DB para App
 const mapRental = (r: any): Rental => ({
   id: r.id,
   eventId: r.event_id,
@@ -58,13 +58,34 @@ const mapRental = (r: any): Rental => ({
   status: r.status as RentalStatus,
   notes: r.notes,
   registeredBy: r.registered_by,
-  accessories: r.accessories, // JSONB já vem como objeto
-  returnedAccessories: r.returned_accessories // JSONB
+  accessories: r.accessories, 
+  returnedAccessories: r.returned_accessories 
 });
 
 // --- API METHODS ---
 
 export const api = {
+  // CATEGORIES
+  fetchCategories: async () => {
+    const { data, error } = await supabase.from('equipment_categories').select('*').order('name');
+    if (error) throw error;
+    return data.map(mapCategory);
+  },
+  createCategory: async (name: string) => {
+    const { data, error } = await supabase.from('equipment_categories').insert({ name }).select().single();
+    if (error) throw error;
+    return mapCategory(data);
+  },
+  updateCategory: async (id: string, name: string) => {
+    const { data, error } = await supabase.from('equipment_categories').update({ name }).eq('id', id).select().single();
+    if (error) throw error;
+    return mapCategory(data);
+  },
+  deleteCategory: async (id: string) => {
+    const { error } = await supabase.from('equipment_categories').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   // EVENTS
   fetchEvents: async () => {
     const { data, error } = await supabase.from('events').select('*').order('start_date', { ascending: false });
@@ -110,6 +131,21 @@ export const api = {
     if (error) throw error;
     return mapEquipment(data);
   },
+  updateEquipment: async (eq: Equipment) => {
+    const { data, error } = await supabase.from('equipment').update({
+        inventory_number: eq.inventoryNumber,
+        name: eq.name,
+        brand: eq.brand,
+        model: eq.model,
+        category: eq.category
+    }).eq('id', eq.id).select().single();
+    if (error) throw error;
+    return mapEquipment(data);
+  },
+  deleteEquipment: async (id: string) => {
+    const { error } = await supabase.from('equipment').delete().eq('id', id);
+    if (error) throw error;
+  },
 
   // SECTORS
   fetchSectors: async () => {
@@ -126,6 +162,19 @@ export const api = {
     if (error) throw error;
     return mapSector(data);
   },
+  updateSector: async (sec: Sector) => {
+    const { data, error } = await supabase.from('sectors').update({
+        name: sec.name,
+        coordinator_name: sec.coordinatorName,
+        coordinator_phone: sec.coordinatorPhone
+    }).eq('id', sec.id).select().single();
+    if (error) throw error;
+    return mapSector(data);
+  },
+  deleteSector: async (id: string) => {
+    const { error } = await supabase.from('sectors').delete().eq('id', id);
+    if (error) throw error;
+  },
 
   // USERS
   fetchUsers: async () => {
@@ -133,11 +182,9 @@ export const api = {
     if (error) throw error;
     return data.map(mapUser);
   },
-  
-  // Cria o perfil na tabela 'profiles' após o Auth criar o usuário
   createProfile: async (user: User) => {
       const { data, error } = await supabase.from('profiles').insert({
-          id: user.id, // ID deve vir do Auth
+          id: user.id, 
           name: user.name,
           email: user.email,
           role: user.role,
@@ -145,11 +192,9 @@ export const api = {
           phone: user.phone,
           preferred_name: user.preferredName
       }).select().single();
-      
       if (error) throw error;
       return mapUser(data);
   },
-
   updateProfile: async (user: User) => {
       const { data, error } = await supabase.from('profiles').update({
           name: user.name,
@@ -157,7 +202,6 @@ export const api = {
           phone: user.phone,
           preferred_name: user.preferredName
       }).eq('id', user.id).select().single();
-
       if (error) throw error;
       return mapUser(data);
   },
@@ -194,7 +238,6 @@ export const api = {
       if (status === 'Devolvido') {
           updates.actual_return_date = new Date().toISOString().split('T')[0];
       }
-
       const { data, error } = await supabase.from('rentals').update(updates).eq('id', id).select().single();
       if (error) throw error;
       return mapRental(data);

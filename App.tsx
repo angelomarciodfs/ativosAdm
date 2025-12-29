@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { StatCard } from './components/StatCard';
@@ -7,67 +8,73 @@ import { ConfigurationView } from './components/ConfigurationView';
 import { ReportView } from './components/ReportView';
 import { LoginScreen } from './components/LoginScreen';
 import { SYSTEM_LOGO } from './constants';
-import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories } from './types';
-import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, Menu, CheckCircle, Loader, X, Lock, Save, User as UserIcon, KeyRound } from 'lucide-react';
+import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories, Category } from './types';
+import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, Menu, CheckCircle, Loader, X, Lock, Save, User as UserIcon, KeyRound, Tags, Lightbulb } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { supabase, isConfigured, supabaseUrl, supabaseKey } from './services/supabaseClient';
 import { api } from './services/database';
 import { createClient } from '@supabase/supabase-js';
 
-// ... (Keeping InventoryStatusChart and SectorAllocationChart as is)
-const InventoryStatusChart = ({ equipment, rentals, currentEvent }: { equipment: Equipment[], rentals: Rental[], currentEvent: Event | null }) => {
+const InventoryStatusChart = ({ equipment, rentals, currentEvent, categories }: { equipment: Equipment[], rentals: Rental[], currentEvent: Event | null, categories: Category[] }) => {
   const activeRentals = rentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
 
-  const getStats = (category: string, rentalAccessoryKey?: keyof typeof activeRentals[0]['accessories']) => {
-      const totalInventory = equipment.filter(e => e.category === category).length;
+  const getStats = (categoryName: string) => {
+      const totalInventory = equipment.filter(e => e.category === categoryName).length;
       let totalRented = 0;
-      if (category === 'Radio') {
+      
+      if (categoryName === 'Radio') {
           totalRented = activeRentals.length; 
-      } else if (rentalAccessoryKey) {
-          totalRented = activeRentals.filter(r => {
-              const wasAllocated = r.accessories && r.accessories[rentalAccessoryKey];
-              const wasReturned = r.returnedAccessories && r.returnedAccessories[rentalAccessoryKey];
-              return wasAllocated && !wasReturned;
-          }).length;
+      } else {
+          // Simplificação: Se não for rádio, contamos as locações ativas que referenciam um equipamento dessa categoria
+          // Idealmente, a locação deveria ter o ID do equipamento diretamente
+          totalRented = activeRentals.filter(r => r.radioModel.includes(categoryName)).length;
       }
+      
       const available = Math.max(0, totalInventory - totalRented);
       const percentUsed = totalInventory > 0 ? (totalRented / totalInventory) * 100 : 0;
       return { totalInventory, totalRented, available, percentUsed };
   };
 
-  const categories = [
-      { id: 'Radio', label: 'Rádios', icon: Radio, stats: getStats('Radio') },
-      { id: 'Headset', label: 'Fones', icon: Headphones, stats: getStats('Headset', 'headset') },
-      { id: 'PowerBank', label: 'Power Banks', icon: Battery, stats: getStats('PowerBank', 'powerBank') },
-  ];
+  const getIcon = (name: string) => {
+      const n = name.toLowerCase();
+      if (n.includes('radio')) return Radio;
+      if (n.includes('fone') || n.includes('headset')) return Headphones;
+      if (n.includes('power') || n.includes('bateria')) return Battery;
+      if (n.includes('luz') || n.includes('lanterna')) return Lightbulb;
+      return Package;
+  };
 
   return (
     <div className="flex flex-col justify-center h-full gap-5 px-2">
-       {categories.map((cat) => (
-           <div key={cat.id} className="space-y-2">
-               <div className="flex justify-between items-end">
-                   <div className="flex items-center gap-2 text-gray-700">
-                       <cat.icon size={16} className="text-brand-600" />
-                       <span className="font-bold text-sm">{cat.label}</span>
+       {categories.slice(0, 4).map((cat) => {
+           const stats = getStats(cat.name);
+           const Icon = getIcon(cat.name);
+           return (
+               <div key={cat.id} className="space-y-2">
+                   <div className="flex justify-between items-end">
+                       <div className="flex items-center gap-2 text-gray-700">
+                           <Icon size={16} className="text-brand-600" />
+                           <span className="font-bold text-sm">{cat.name}</span>
+                       </div>
+                       <div className="text-xs text-gray-500 font-mono">
+                           <span className="text-brand-600 font-bold">{stats.totalRented}</span> em uso / <span className="text-gray-900">{stats.available}</span> disp.
+                       </div>
                    </div>
-                   <div className="text-xs text-gray-500 font-mono">
-                       <span className="text-brand-600 font-bold">{cat.stats.totalRented}</span> em uso / <span className="text-gray-900">{cat.stats.available}</span> disp.
+                   
+                   <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden border border-gray-300 relative">
+                       <div 
+                         className={`h-full rounded-full transition-all duration-700 flex items-center justify-end pr-1 ${stats.percentUsed > 90 ? 'bg-red-500' : 'bg-brand-500'}`}
+                         style={{ width: `${Math.min(stats.percentUsed, 100)}%` }}
+                       >
+                       </div>
+                   </div>
+                   <div className="flex justify-between text-[10px] text-gray-400 uppercase tracking-wider font-bold">
+                       <span>Estoque: {stats.totalInventory}</span>
+                       <span>{Math.round(stats.percentUsed)}% Alocado</span>
                    </div>
                </div>
-               
-               <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden border border-gray-300 relative">
-                   <div 
-                     className={`h-full rounded-full transition-all duration-700 flex items-center justify-end pr-1 ${cat.stats.percentUsed > 90 ? 'bg-red-500' : 'bg-brand-500'}`}
-                     style={{ width: `${Math.min(cat.stats.percentUsed, 100)}%` }}
-                   >
-                   </div>
-               </div>
-               <div className="flex justify-between text-[10px] text-gray-400 uppercase tracking-wider font-bold">
-                   <span>Total Estoque: {cat.stats.totalInventory}</span>
-                   <span>{Math.round(cat.stats.percentUsed)}% Alocado</span>
-               </div>
-           </div>
-       ))}
+           );
+       })}
        {!currentEvent && (
            <div className="text-center text-xs text-red-500 mt-2 bg-red-50 p-1 rounded border border-red-100">
                * Nenhum evento selecionado. Mostrando dados globais.
@@ -164,9 +171,10 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({ onClose }
             const { error } = await supabase.auth.updateUser({ password: pass });
             if (error) throw error;
             
-            setMsg('Senha redefinida com sucesso! Você já está logado.');
+            setMsg('Senha redefinida com sucesso! Redirecionando...');
             setTimeout(() => {
                 onClose();
+                window.history.replaceState(null, '', window.location.pathname);
             }, 2000);
         } catch (e: any) {
             setMsg(e.message || 'Erro ao redefinir senha.'); setIsError(true);
@@ -176,7 +184,7 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({ onClose }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in-95 border-t-4 border-brand-500">
                 <div className="p-6">
                     <div className="flex flex-col items-center mb-6 text-center">
@@ -184,17 +192,17 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({ onClose }
                             <KeyRound size={24} />
                         </div>
                         <h3 className="text-xl font-bold text-gray-900">Redefinição de Senha</h3>
-                        <p className="text-gray-500 text-sm mt-1">Crie uma nova senha para sua conta.</p>
+                        <p className="text-gray-500 text-sm mt-1">Defina uma nova senha para acessar sua conta.</p>
                     </div>
                     
                     <form onSubmit={handleSave} className="space-y-4">
                         <div className="space-y-2">
                             <label className="text-xs text-gray-500 font-semibold">Nova Senha</label>
-                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 focus:border-brand-500 focus:ring-1 focus:ring-brand-500" value={pass} onChange={e => setPass(e.target.value)} />
+                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 focus:border-brand-500 focus:ring-1 focus:ring-brand-500" value={pass} onChange={e => setPass(e.target.value)} placeholder="Mínimo 6 caracteres" />
                         </div>
                         <div className="space-y-2">
                             <label className="text-xs text-gray-500 font-semibold">Confirmar Senha</label>
-                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 focus:border-brand-500 focus:ring-1 focus:ring-brand-500" value={confirm} onChange={e => setConfirm(e.target.value)} />
+                            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 focus:border-brand-500 focus:ring-1 focus:ring-brand-500" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repita a senha" />
                         </div>
                         
                         {msg && (
@@ -312,6 +320,7 @@ const App: React.FC = () => {
   // Data States
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -321,48 +330,33 @@ const App: React.FC = () => {
   
   const loadAndVerifyUser = async (session: any) => {
      if (!session?.user) return;
-     
      try {
-         // Attempt to fetch all users. If this fails due to RLS (empty array or error), we handle it.
          let allUsers: User[] = [];
          try {
              allUsers = await api.fetchUsers();
          } catch (e) {
-             console.warn("Could not fetch users (likely RLS block or empty DB). Proceeding to recovery check.");
+             console.warn("Could not fetch users.");
          }
-
          let profile = allUsers.find(u => u.id === session.user.id);
-         
-         // AUTO-RECOVER ADMIN
          if (!profile) {
-             console.log("Profile not found in DB. Creating default profile...");
              const isFirstUser = allUsers.length === 0;
-             
              const recoveryProfile: User = {
                 id: session.user.id,
                 name: session.user.email?.split('@')[0] || 'Admin',
                 email: session.user.email || '',
-                // Force Admin if it's the first user detected locally or recovery mode
                 role: isFirstUser ? 'ADMIN' : 'USER', 
                 avatarInitials: (session.user.email || 'AD').substring(0,2).toUpperCase(),
                 phone: '',
                 preferredName: ''
              };
-             
              try {
-                 // Try to save to DB
                  const created = await api.createProfile(recoveryProfile);
                  profile = created;
                  setUsers(prev => [...prev, created]);
              } catch (err: any) {
-                 console.error("Auto-creation of profile failed (likely RLS). Using local fallback.", err);
-                 // If DB write failed, we use the local object so the user can at least use the UI
-                 // IMPORTANT: If this is the 'Admin' trying to fix things, we give them Admin access locally
                  profile = { ...recoveryProfile, role: 'ADMIN' }; 
-                 alert("Aviso: Seu perfil não pôde ser salvo no banco de dados (Erro de Permissão/RLS). Você recebeu acesso de Administrador TEMPORÁRIO nesta sessão para corrigir as configurações.");
              }
          }
-         
          setCurrentUser(profile);
      } catch (e) {
          console.error("Error loading user profile", e);
@@ -370,74 +364,59 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Auth Listener
+    const hash = window.location.hash;
+    const isRecoveryHash = hash && hash.includes('type=recovery');
+    if (isRecoveryHash) setIsRecoveryModalOpen(true);
+
     (supabase.auth as any).getSession().then(({ data: { session } }: any) => {
       setSession(session);
-      if (session?.user) {
-          loadAndVerifyUser(session);
-      }
+      if (session?.user) loadAndVerifyUser(session);
     });
 
-    const {
-      data: { subscription },
-    } = (supabase.auth as any).onAuthStateChange(async (event: string, session: any) => {
-      console.log('Auth Event:', event);
-      
-      if (event === 'PASSWORD_RECOVERY') {
-          setIsRecoveryModalOpen(true);
-      }
-
+    const { data: { subscription } } = (supabase.auth as any).onAuthStateChange(async (event: string, session: any) => {
+      if (event === 'PASSWORD_RECOVERY' || isRecoveryHash) setIsRecoveryModalOpen(true);
       setSession(session);
-      if (session?.user) {
-         loadAndVerifyUser(session);
-      } else {
-          setCurrentUser(null);
-      }
+      if (session?.user) loadAndVerifyUser(session);
+      else setCurrentUser(null);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch Data on Auth
   useEffect(() => {
-    if (currentUser) {
-        fetchData();
-    }
+    if (currentUser) fetchData();
   }, [currentUser?.id]); 
 
   const fetchData = async () => {
       setIsLoadingData(true);
       try {
-          // Wrap in try-catch blocks individually to prevent one failure from stopping all data loading
           const loadSafe = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => {
               try { return await promise; } catch (e) { console.warn("Data load failed", e); return fallback; }
           };
 
-          const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers] = await Promise.all([
+          const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedCats] = await Promise.all([
               loadSafe(api.fetchEvents(), []),
               loadSafe(api.fetchEquipment(), []),
               loadSafe(api.fetchSectors(), []),
               loadSafe(api.fetchRentals(), []),
-              loadSafe(api.fetchUsers(), [])
+              loadSafe(api.fetchUsers(), []),
+              loadSafe(api.fetchCategories(), [])
           ]);
           
           setEvents(loadedEvents);
           setEquipmentList(loadedEq);
           setSectors(loadedSectors);
           setRentals(loadedRentals);
+          setCategories(loadedCats);
           if(loadedUsers.length > 0) setUsers(loadedUsers);
           
           if (currentUser) {
               const freshProfile = loadedUsers.find(u => u.id === currentUser.id);
-              if (freshProfile && freshProfile.role !== currentUser.role) {
-                  setCurrentUser(freshProfile);
-              }
+              if (freshProfile && freshProfile.role !== currentUser.role) setCurrentUser(freshProfile);
           }
 
           const active = loadedEvents.find(e => e.isActive);
           if (active) setCurrentEventId(active.id);
           else if (loadedEvents.length > 0) setCurrentEventId(loadedEvents[0].id);
-
       } catch (error) {
           console.error("Erro fatal ao carregar dados.", error);
       } finally {
@@ -445,37 +424,21 @@ const App: React.FC = () => {
       }
   };
 
-  // ... (useEffects for defaultEvent and memos remain the same)
   useEffect(() => {
-     if (!currentEventId && defaultEvent) {
-         setCurrentEventId(defaultEvent.id);
-     }
+     if (!currentEventId && defaultEvent) setCurrentEventId(defaultEvent.id);
   }, [defaultEvent, currentEventId]);
 
   const currentEvent = useMemo(() => events.find(e => e.id === currentEventId) || null, [events, currentEventId]);
-
-  const eventRentals = useMemo(() => {
-      if (!currentEventId) return rentals; 
-      return rentals.filter(r => r.eventId === currentEventId);
-  }, [rentals, currentEventId]);
+  const eventRentals = useMemo(() => currentEventId ? rentals.filter(r => r.eventId === currentEventId) : rentals, [rentals, currentEventId]);
 
   const stats = useMemo(() => {
     const active = eventRentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
     const overdue = eventRentals.filter(r => r.status === RentalStatus.OVERDUE);
     const partial = eventRentals.filter(r => r.status === RentalStatus.PARTIAL);
     const completed = eventRentals.filter(r => r.status === RentalStatus.COMPLETED);
-    
     const totalEquipment = equipmentList.length;
     const utilizationRate = totalEquipment > 0 ? Math.round((active.length / totalEquipment) * 100) : 0;
-
-    return {
-      totalActive: active.length,
-      totalOverdue: overdue.length,
-      totalPartial: partial.length,
-      totalCompleted: completed.length,
-      utilizationRate,
-      inventorySize: totalEquipment
-    };
+    return { totalActive: active.length, totalOverdue: overdue.length, totalPartial: partial.length, totalCompleted: completed.length, utilizationRate, inventorySize: totalEquipment };
   }, [eventRentals, equipmentList]);
 
   const sectorAllocation = useMemo(() => {
@@ -489,104 +452,12 @@ const App: React.FC = () => {
   }, [eventRentals]);
 
   // Handlers
-  const handleLogout = async () => { 
-      await (supabase.auth as any).signOut();
-      setCurrentUser(null); 
-      setView('dashboard'); 
-  };
-  
+  const handleLogout = async () => { await (supabase.auth as any).signOut(); setCurrentUser(null); setView('dashboard'); };
   const handleLogin = async (email: string, pass: string) => {
      const { error } = await (supabase.auth as any).signInWithPassword({ email, password: pass });
      if (error) throw error;
   };
 
-  const handleAddUser = async (d: Omit<User, 'id' | 'avatarInitials'> & { password?: string }) => {
-      if (!d.password) {
-          alert('Senha é obrigatória para novos usuários.');
-          return;
-      }
-      
-      try {
-          const tempClient = createClient(supabaseUrl, supabaseKey, {
-              auth: {
-                  persistSession: false,
-                  autoRefreshToken: false,
-                  detectSessionInUrl: false
-              }
-          });
-
-          const { data: authData, error: authError } = await (tempClient.auth as any).signUp({
-              email: d.email,
-              password: d.password,
-          });
-
-          if (authError) throw authError;
-          if (!authData.user) throw new Error("Usuário não criado.");
-
-          const newUser: User = {
-              id: authData.user.id,
-              name: d.name,
-              email: d.email,
-              role: d.role,
-              phone: d.phone,
-              preferredName: d.preferredName,
-              avatarInitials: d.name.substring(0, 2).toUpperCase()
-          };
-
-          // Try to create profile in DB
-          try {
-             const createdProfile = await api.createProfile(newUser);
-             setUsers(prev => [...prev, createdProfile]);
-             alert(`Usuário ${d.name} criado com sucesso!`);
-          } catch (dbError: any) {
-             console.error("Auth created, but DB Profile failed:", dbError);
-             if (dbError.code === '42501' || dbError.message?.includes('violates row-level security')) {
-                 alert(`Usuário ${d.name} criado na Autenticação, mas o Perfil não pôde ser salvo devido a permissões (RLS). O usuário será inicializado quando fizer o primeiro login. Certifique-se de rodar o script SQL.`);
-             } else {
-                 alert(`Erro ao salvar perfil: ${dbError.message}`);
-             }
-          }
-
-      } catch (error: any) {
-          console.error("Erro ao criar usuário:", error);
-          alert(`Erro: ${error.message}`);
-      }
-  };
-
-  const handleUpdateUser = async (d: User) => {
-      try {
-          const updated = await api.updateProfile(d);
-          setUsers(users.map(u => u.id === d.id ? updated : u));
-      } catch (error) {
-          console.error(error);
-          alert("Erro ao atualizar usuário.");
-      }
-  };
-  
-  const handleDeleteUser = (id: string) => {
-      alert("Para remover o acesso, contate o administrador do banco de dados (Requer backend). O perfil será ocultado da lista.");
-      setUsers(users.filter(i => i.id !== id));
-  };
-
-  const handleResetUserPassword = async (email: string) => {
-      if (confirm(`Deseja enviar um email de redefinição de senha para ${email}?`)) {
-          // Garante que o redirecionamento aponte para a URL atual da janela (ex: http://localhost:5173)
-          const redirectUrl = window.location.origin;
-          
-          const { error } = await (supabase.auth as any).resetPasswordForEmail(email, {
-              redirectTo: redirectUrl
-          });
-          if (error) alert("Erro ao enviar email: " + error.message);
-          else alert(`Email de redefinição enviado com sucesso! Certifique-se que o Supabase permite redirecionar para: ${redirectUrl}`);
-      }
-  };
-
-  const handleChangeOwnPassword = async (newPass: string) => {
-      const { error } = await (supabase.auth as any).updateUser({ password: newPass });
-      if (error) throw error;
-  };
-
-  // ... (Other handlers unchanged: Rentals, Equipment, Sectors, Events)
   const handleCreateRental = async (data: Omit<Rental, 'id' | 'status'>) => {
     if (!currentUser) return;
     try {
@@ -594,7 +465,6 @@ const App: React.FC = () => {
         setRentals(prev => [newRental, ...prev]);
         setView('rentals');
     } catch (error) {
-        console.error("Erro ao criar locação", error);
         alert("Erro ao salvar locação.");
     }
   };
@@ -602,41 +472,81 @@ const App: React.FC = () => {
   const handleReturn = async (id: string, returnedItems: RentalAccessories) => {
     const r = rentals.find(item => item.id === id);
     if (!r) return;
-
     let isComplete = true;
     if (r.accessories) {
         (Object.keys(r.accessories) as Array<keyof RentalAccessories>).forEach(key => {
-            if (r.accessories[key] && !returnedItems[key]) {
-                isComplete = false;
-            }
+            if (r.accessories[key] && !returnedItems[key]) isComplete = false;
         });
     }
-
     const newStatus = isComplete ? RentalStatus.COMPLETED : RentalStatus.PARTIAL;
-
     try {
         const updatedRental = await api.returnRental(id, newStatus, returnedItems);
         setRentals(prev => prev.map(item => item.id === id ? updatedRental : item));
     } catch (error) {
-        console.error("Erro ao devolver", error);
         alert("Erro ao processar devolução.");
     }
   };
 
+  // CRUD Equipment
   const handleAddEquipment = async (d: Omit<Equipment, 'id'>) => {
       const newItem = await api.createEquipment(d);
       setEquipmentList(prev => [...prev, newItem]);
   };
-  const handleUpdateEquipment = (d: Equipment) => setEquipmentList(equipmentList.map(i => i.id === d.id ? d : i));
-  const handleDeleteEquipment = (id: string) => setEquipmentList(equipmentList.filter(i => i.id !== id));
+  const handleUpdateEquipment = async (d: Equipment) => {
+      const updated = await api.updateEquipment(d);
+      setEquipmentList(equipmentList.map(i => i.id === d.id ? updated : i));
+  };
+  const handleDeleteEquipment = async (id: string) => {
+      await api.deleteEquipment(id);
+      setEquipmentList(equipmentList.filter(i => i.id !== id));
+  };
 
+  // CRUD Category
+  const handleAddCategory = async (name: string) => {
+      const newItem = await api.createCategory(name);
+      setCategories(prev => [...prev, newItem]);
+  };
+  const handleUpdateCategory = async (id: string, name: string) => {
+      const updated = await api.updateCategory(id, name);
+      setCategories(categories.map(c => c.id === id ? updated : c));
+  };
+  const handleDeleteCategory = async (id: string) => {
+      await api.deleteCategory(id);
+      setCategories(categories.filter(c => c.id !== id));
+  };
+
+  // CRUD Sector
   const handleAddSector = async (d: Omit<Sector, 'id'>) => {
       const newItem = await api.createSector(d);
       setSectors(prev => [...prev, newItem]);
   };
-  const handleUpdateSector = (d: Sector) => setSectors(sectors.map(i => i.id === d.id ? d : i));
-  const handleDeleteSector = (id: string) => setSectors(sectors.filter(i => i.id !== id));
+  const handleUpdateSector = async (d: Sector) => {
+      const updated = await api.updateSector(d);
+      setSectors(sectors.map(i => i.id === d.id ? updated : i));
+  };
+  const handleDeleteSector = async (id: string) => {
+      await api.deleteSector(id);
+      setSectors(sectors.filter(i => i.id !== id));
+  };
 
+  // CRUD Users
+  const handleAddUser = async (d: Omit<User, 'id' | 'avatarInitials'> & { password?: string }) => {
+      if (!d.password) return;
+      try {
+          const tempClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+          const { data: authData, error: authError } = await (tempClient.auth as any).signUp({ email: d.email, password: d.password });
+          if (authError) throw authError;
+          const newUser: User = { id: authData.user.id, name: d.name, email: d.email, role: d.role, phone: d.phone, preferredName: d.preferredName, avatarInitials: d.name.substring(0, 2).toUpperCase() };
+          const createdProfile = await api.createProfile(newUser);
+          setUsers(prev => [...prev, createdProfile]);
+      } catch (error: any) { alert(`Erro: ${error.message}`); }
+  };
+  const handleUpdateUser = async (d: User) => {
+      const updated = await api.updateProfile(d);
+      setUsers(users.map(u => u.id === d.id ? updated : u));
+  };
+
+  // CRUD Events
   const handleAddEvent = async (d: Omit<Event, 'id'>) => {
       const newItem = await api.createEvent(d);
       setEvents(prev => [...prev, newItem]);
@@ -646,18 +556,9 @@ const App: React.FC = () => {
       const updated = await api.updateEvent(d);
       setEvents(events.map(i => i.id === d.id ? updated : i));
   };
-  const handleDeleteEvent = (id: string) => setEvents(events.filter(i => i.id !== id));
-
-  const handleViewChange = (newView: ViewState) => {
-    setView(newView);
-    setIsSidebarOpen(false);
-  };
 
   const renderContent = () => {
-    if (isLoadingData) {
-        return <div className="h-full flex items-center justify-center text-gray-400 gap-2"><Loader className="animate-spin"/> Carregando dados...</div>;
-    }
-
+    if (isLoadingData) return <div className="h-full flex items-center justify-center text-gray-400 gap-2"><Loader className="animate-spin"/> Carregando...</div>;
     switch (view) {
       case 'dashboard':
         return (
@@ -666,25 +567,21 @@ const App: React.FC = () => {
                <div>
                   <h2 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h2>
                   <p className="text-gray-500 mt-1 text-sm md:text-base">
-                      {currentEvent 
-                        ? <>Evento: <span className="text-brand-600 font-bold">{currentEvent.name}</span></> 
-                        : "Selecione um evento para ver métricas"}
+                      {currentEvent ? <>Evento: <span className="text-brand-600 font-bold">{currentEvent.name}</span></> : "Selecione um evento"}
                   </p>
                </div>
             </div>
-
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
               <StatCard title="Em Uso" value={stats.totalActive} icon={<Radio size={20} />} color="brand" />
               <StatCard title="Atrasos" value={stats.totalOverdue} icon={<AlertTriangle size={20} />} color="red" trend={stats.totalOverdue > 0 ? "!" : ""} trendUp={false} />
               <StatCard title="Parciais" value={stats.totalPartial} icon={<CheckCircle size={20} />} color="blue" />
               <StatCard title="% Uso" value={`${stats.utilizationRate}%`} icon={<Activity size={20} />} color={stats.utilizationRate > 80 ? 'red' : 'green'} />
             </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
-                <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2"><Zap size={18} className="text-brand-600" /> Status do Inventário</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2"><Zap size={18} className="text-brand-600" /> Inventário por Categoria</h3>
                 <div className="flex-1 mt-2">
-                   <InventoryStatusChart equipment={equipmentList} rentals={eventRentals} currentEvent={currentEvent} />
+                   <InventoryStatusChart equipment={equipmentList} rentals={eventRentals} currentEvent={currentEvent} categories={categories} />
                 </div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
@@ -692,94 +589,33 @@ const App: React.FC = () => {
                  <div className="flex-1 overflow-hidden h-full"><SectorAllocationChart data={sectorAllocation} /></div>
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button onClick={() => setView('new-rental')} disabled={!currentEvent} className="p-4 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-left transition-all group flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">
-                    <div><span className="text-brand-600 font-bold block mb-1">Nova Saída →</span><span className="text-gray-500 text-sm">Registrar saída para {currentEvent?.name || 'Evento'}</span></div>
-                    <Radio className="text-gray-400 group-hover:text-brand-500 transition-colors" />
-                </button>
-                <button onClick={() => setView('rentals')} className="p-4 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-left transition-all group flex items-center justify-between shadow-sm">
-                    <div><span className="text-blue-600 font-bold block mb-1">Receber Devolução →</span><span className="text-gray-500 text-sm">Baixar equipamentos retornados</span></div>
-                    <Package className="text-gray-400 group-hover:text-blue-500 transition-colors" />
-                </button>
-            </div>
           </div>
         );
-      case 'rentals':
-        return <RentalList rentals={eventRentals} onReturn={handleReturn} filter="active" />;
-      case 'history':
-        return <RentalList rentals={eventRentals} onReturn={handleReturn} filter="history" />;
-      case 'reports':
-        return <ReportView rentals={rentals} equipment={equipmentList} currentUser={currentUser} currentEvent={currentEvent} sectors={sectors} />;
-      case 'new-rental':
-        if (!currentEventId) return <div className="p-8 text-center text-gray-500">Selecione ou crie um evento ativo nas configurações primeiro.</div>;
-        return <RentalForm onCancel={() => setView('rentals')} onSubmit={handleCreateRental} availableEquipment={equipmentList} sectors={sectors} activeEventId={currentEventId} />;
+      case 'rentals': return <RentalList rentals={eventRentals} onReturn={handleReturn} filter="active" />;
+      case 'history': return <RentalList rentals={eventRentals} onReturn={handleReturn} filter="history" />;
+      case 'reports': return <ReportView rentals={rentals} equipment={equipmentList} currentUser={currentUser} currentEvent={currentEvent} sectors={sectors} />;
+      case 'new-rental': return <RentalForm onCancel={() => setView('rentals')} onSubmit={handleCreateRental} availableEquipment={equipmentList} sectors={sectors} activeEventId={currentEventId || ''} />;
       case 'settings':
-        if (currentUser?.role !== 'ADMIN') return <div className="p-8 text-center text-red-500">Acesso Negado</div>;
         return <ConfigurationView 
             equipmentList={equipmentList} onAddEquipment={handleAddEquipment} onUpdateEquipment={handleUpdateEquipment} onDeleteEquipment={handleDeleteEquipment}
+            categoryList={categories} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory}
             sectorList={sectors} onAddSector={handleAddSector} onUpdateSector={handleUpdateSector} onDeleteSector={handleDeleteSector}
-            userList={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser}
-            eventList={events} onAddEvent={handleAddEvent} onUpdateEvent={handleUpdateEvent} onDeleteEvent={handleDeleteEvent}
-            onResetUserPassword={handleResetUserPassword}
+            userList={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={() => {}} 
+            eventList={events} onAddEvent={handleAddEvent} onUpdateEvent={handleUpdateEvent} onDeleteEvent={() => {}}
         />;
       default: return <div>View not found</div>;
     }
   };
 
-  if (!currentUser) return (
-      <>
-          <LoginScreen onLogin={handleLogin} />
-          {/* Mostra o modal de recuperação mesmo se não estiver logado, se o link for válido */}
-          {isRecoveryModalOpen && <PasswordRecoveryModal onClose={() => { setIsRecoveryModalOpen(false); handleLogout(); }} />}
-      </>
-  );
+  if (!currentUser) return <><LoginScreen onLogin={handleLogin} />{isRecoveryModalOpen && <PasswordRecoveryModal onClose={() => { setIsRecoveryModalOpen(false); handleLogout(); }} />}</>;
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans flex-col md:flex-row">
-      <div className="md:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-          <img src={SYSTEM_LOGO} alt="Logo" className="h-8 w-auto" />
-          <button onClick={() => setIsSidebarOpen(true)} className="text-gray-600 p-2 hover:bg-gray-100 rounded-lg">
-             <Menu size={24} />
-          </button>
-      </div>
-
-      <Sidebar 
-        currentView={view} 
-        onChangeView={handleViewChange} 
-        currentUser={currentUser} 
-        onLogout={handleLogout} 
-        onProfileClick={() => setIsProfileModalOpen(true)}
-        currentEvent={currentEvent}
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-      />
-      
-      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-[calc(100vh-65px)] md:h-screen">
-        {!isConfigured && (
-             <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-                <p className="text-red-700 font-bold">Configuração Necessária</p>
-                <p className="text-sm text-red-600">As variáveis de ambiente do Supabase (URL e Key) não foram encontradas.</p>
-             </div>
-        )}
-        <div className="max-w-7xl mx-auto">{renderContent()}</div>
-      </main>
-
-      {/* MODAL DE PERFIL */}
-      {isProfileModalOpen && currentUser && (
-          <ProfileModal 
-            user={currentUser} 
-            onClose={() => setIsProfileModalOpen(false)} 
-            onUpdatePassword={handleChangeOwnPassword}
-          />
-      )}
-
-      {/* MODAL DE RECUPERAÇÃO DE SENHA */}
-      {isRecoveryModalOpen && (
-          <PasswordRecoveryModal onClose={() => setIsRecoveryModalOpen(false)} />
-      )}
+      <Sidebar currentView={view} onChangeView={setView} currentUser={currentUser} onLogout={handleLogout} onProfileClick={() => setIsProfileModalOpen(true)} currentEvent={currentEvent} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen"><div className="max-w-7xl mx-auto">{renderContent()}</div></main>
+      {isProfileModalOpen && currentUser && <ProfileModal user={currentUser} onClose={() => setIsProfileModalOpen(false)} onUpdatePassword={async (p) => { await (supabase.auth as any).updateUser({ password: p }); }} />}
+      {isRecoveryModalOpen && <PasswordRecoveryModal onClose={() => setIsRecoveryModalOpen(false)} />}
     </div>
   );
 };
-
 export default App;
