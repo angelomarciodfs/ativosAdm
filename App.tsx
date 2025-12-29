@@ -263,7 +263,19 @@ const App: React.FC = () => {
                 if (data.user) await api.createProfile({ id: data.user.id, name: d.name, email: d.email, role: d.role, avatarInitials: d.name.substring(0,2).toUpperCase() });
                 fetchData();
             }} 
-            onUpdateUser={async (d) => { await api.updateProfile(d); await fetchData(); }} 
+            onUpdateUser={async (d) => { 
+                await api.updateProfile(d);
+                if (d.password) {
+                   // Nota: Supabase não permite troca de senha de terceiros via Auth regular sem Service Role Key ou Edge Function.
+                   // Se d.id === currentUser.id, o auth.updateUser funcionaria.
+                   if (d.id === currentUser?.id) {
+                      await supabase.auth.updateUser({ password: d.password });
+                   } else {
+                      alert("Nota: A troca de senha de terceiros requer integração administrativa dedicada.");
+                   }
+                }
+                await fetchData(); 
+            }} 
             onDeleteUser={() => {}} 
             eventList={events} 
             onAddEvent={async (d) => { await api.createEvent(d); await fetchData(); }} 

@@ -18,7 +18,7 @@ interface ConfigurationViewProps {
   onDeleteSector: (id: string) => void;
   userList: User[];
   onAddUser: (user: Omit<User, 'id' | 'avatarInitials'> & { password?: string }) => void;
-  onUpdateUser: (user: User) => void;
+  onUpdateUser: (user: User & { password?: string }) => void;
   onDeleteUser: (id: string) => void;
   eventList: Event[];
   onAddEvent: (event: Omit<Event, 'id'>) => void;
@@ -306,7 +306,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                 <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black">
                         <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : 'Patrimônio / ID'}</th>
-                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : 'Datas / Info'}</th>
+                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : 'NOME / INFO'}</th>
                         <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado por' : 'Status / Vínculo'}</th>
                         <th className="p-4 text-right">Ações</th>
                     </tr>
