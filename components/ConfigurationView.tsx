@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Equipment, Sector, User, UserRole, Event, EquipmentItem, Channel } from '../types';
-import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key, Radio as RadioIcon, Activity, Phone } from 'lucide-react';
+import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key, Radio as RadioIcon, Activity, Phone, Power, Check, X } from 'lucide-react';
 
 interface ConfigurationViewProps {
   equipmentList: Equipment[];
@@ -57,7 +57,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
 
   const maskChannel = (val: string) => {
       let clean = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-      // Formato TOP-01 (3 letras - 2 números)
       if (clean.length > 3) {
           return clean.substring(0, 3) + '-' + clean.substring(3, 5);
       }
@@ -143,14 +142,15 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0">
+      {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Configurações</h2>
-          <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Controle central de ativos e acessos.</p>
+          <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Gestão centralizada do sistema.</p>
         </div>
         <button 
           onClick={() => { setIsAdding(!isAdding); if(isAdding) resetForms(); }}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold transition-all shadow-lg w-full md:w-auto justify-center ${
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg w-full md:w-auto justify-center ${
             isAdding ? 'bg-white text-red-600 border border-red-200 hover:bg-red-50' : 'bg-brand-500 text-white hover:bg-brand-600 shadow-brand-500/20'
           }`}
         >
@@ -158,7 +158,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
         </button>
       </div>
 
-      <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar bg-white rounded-t-xl px-2">
+      {/* TABS NAVIGATION */}
+      <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar bg-white rounded-t-2xl px-2">
         {[
             { id: 'events', label: 'Eventos', icon: Calendar },
             { id: 'inventory', label: 'Inventário', icon: Package },
@@ -169,7 +170,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
             <button 
               key={tab.id} 
               onClick={() => { setActiveTab(tab.id as any); resetForms(); }} 
-              className={`px-6 py-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
+              className={`px-6 py-5 text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
                 activeTab === tab.id ? 'border-brand-500 text-brand-600 bg-brand-50/20' : 'border-transparent text-gray-500 hover:text-gray-900'
               }`}
             >
@@ -179,7 +180,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
       </div>
 
       {activeTab === 'inventory' && (
-          <div className="flex gap-2 p-1.5 bg-gray-100 rounded-lg w-full md:w-fit shadow-inner justify-center md:justify-start">
+          <div className="flex gap-2 p-1.5 bg-gray-100 rounded-lg w-full md:w-fit shadow-inner">
               <button 
                 onClick={() => { setInventorySubTab('ativos'); if(isAdding) resetForms(); }}
                 className={`flex-1 md:flex-none px-5 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'ativos' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -190,13 +191,14 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                 onClick={() => { setInventorySubTab('itens'); if(isAdding) resetForms(); }}
                 className={`flex-1 md:flex-none px-5 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'itens' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
-                Gerenciar ITENS
+                Categorias / Itens
               </button>
           </div>
       )}
 
+      {/* FORMS SECTION */}
       {isAdding && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-2xl animate-in slide-in-from-top-4 duration-300">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-2xl animate-in slide-in-from-top-4 duration-300">
             <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-100 pb-3 uppercase tracking-tighter">
                 <Plus size={20} className="text-brand-500" /> 
                 {editingId ? 'Editar' : 'Novo'} {activeTab === 'inventory' ? (inventorySubTab === 'ativos' ? 'Ativo' : 'ITEM') : activeTab.slice(0, -1).toUpperCase()}
@@ -272,7 +274,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="space-y-1">
                             <label className="text-xs uppercase text-gray-500 font-bold flex justify-between items-center mb-1">
-                                ITEM
+                                CATEGORIA
                                 <button type="button" onClick={() => { setInventorySubTab('itens'); setIsAdding(true); setEditingId(null); }} className="text-brand-600 hover:text-brand-700 text-[9px] font-black border border-brand-200 px-1.5 rounded bg-brand-50 uppercase">NOVO ITEM +</button>
                             </label>
                             <select required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.category} onChange={e => setEqFormData({...eqFormData, category: e.target.value})}>
@@ -298,7 +300,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                 {activeTab === 'inventory' && inventorySubTab === 'itens' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do ITEM (Ex: Lanterna, Rádio)</label>
+                            <label className="text-xs uppercase text-gray-500 font-bold">Nome da Categoria (Ex: Lanterna, Rádio)</label>
                             <input required type="text" placeholder="Digite o nome..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" value={itemFormData.name} onChange={e => setItemFormData({name: e.target.value})} />
                         </div>
                     </div>
@@ -315,7 +317,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                             <input required type="email" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.email} onChange={e => setUserFormData({...userFormData, email: e.target.value})} disabled={!!editingId} />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">{editingId ? 'Nova Senha (deixe vazio para não alterar)' : 'Senha Inicial'}</label>
+                            <label className="text-xs uppercase text-gray-500 font-bold">{editingId ? 'Nova Senha (vazio para não alterar)' : 'Senha Inicial'}</label>
                             <div className="relative">
                                 <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                 <input 
@@ -329,22 +331,18 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Perfil</label>
+                            <label className="text-xs uppercase text-gray-500 font-bold">Perfil de Acesso</label>
                             <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.role} onChange={e => setUserFormData({...userFormData, role: e.target.value as UserRole})}>
-                                <option value="USER">Operador (Apenas Locações)</option>
+                                <option value="USER">Operador (Locações)</option>
                                 <option value="ADMIN">Administrador (Total)</option>
                             </select>
-                        </div>
-                        <div className="md:col-span-2 flex items-center gap-2 py-2">
-                            <input type="checkbox" id="userIsActive" checked={userFormData.isActive} onChange={e => setUserFormData({...userFormData, isActive: e.target.checked})} className="w-5 h-5 accent-brand-500 rounded" />
-                            <label htmlFor="userIsActive" className="text-sm font-bold text-gray-700">Usuário Ativo (Acesso Liberado)</label>
                         </div>
                     </div>
                 )}
 
                 <div className="flex gap-4 pt-4 border-t border-gray-100">
-                    <button type="button" onClick={resetForms} className="flex-1 py-3 border border-gray-200 text-gray-600 font-black rounded-lg hover:bg-gray-50 transition-colors uppercase text-[10px] tracking-widest">Descartar</button>
-                    <button type="submit" className="flex-1 py-3 bg-brand-500 text-white font-black rounded-lg hover:bg-brand-600 shadow-xl shadow-brand-500/30 flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest">
+                    <button type="button" onClick={resetForms} className="flex-1 py-4 border border-gray-200 text-gray-600 font-black rounded-xl hover:bg-gray-50 transition-colors uppercase text-[10px] tracking-widest">Descartar</button>
+                    <button type="submit" className="flex-1 py-4 bg-brand-500 text-white font-black rounded-xl hover:bg-brand-600 shadow-xl shadow-brand-500/30 flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest">
                         <Save size={18} /> Salvar Registro
                     </button>
                 </div>
@@ -352,31 +350,29 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      {/* LIST SECTION */}
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-             <h3 className="text-lg font-black text-gray-900 tracking-tight">Listagem Sincronizada</h3>
-             <span className="bg-gray-100 text-[10px] font-black text-gray-500 px-2 py-0.5 rounded-full border border-gray-200 uppercase tracking-tighter">
-                {filteredData().length} Total
+             <h3 className="text-lg font-black text-gray-900 tracking-tight">Base de Dados</h3>
+             <span className="bg-gray-100 text-[10px] font-black text-gray-500 px-2.5 py-1 rounded-full border border-gray-200 uppercase tracking-tighter">
+                {filteredData().length} Itens
              </span>
           </div>
           <div className="relative w-full md:w-auto">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-            <input type="text" placeholder="Filtrar nesta lista..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm w-full md:w-64 focus:ring-1 focus:ring-brand-500 focus:outline-none" />
+            <input type="text" placeholder="Buscar nesta aba..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm w-full md:w-72 focus:ring-1 focus:ring-brand-500 focus:outline-none" />
           </div>
         </div>
 
         <div className="overflow-x-auto">
-             <table className="w-full text-left border-collapse min-w-[700px]">
+             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black">
-                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : (activeTab === 'sectors' ? 'Sigla' : 'Patrimônio / ID')}</th>
-                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : (activeTab === 'sectors' ? 'Coordenador / WhatsApp' : 'NOME / INFO')}</th>
-                        <th className="p-4">
-                            {activeTab === 'sectors' ? 'Canal Operacional' : 
-                             (activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado por' : 'Status / Vínculo')}
-                        </th>
-                        <th className="p-4 text-right">Ações</th>
+                        <th className="p-4 md:p-6">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Categoria' : (activeTab === 'sectors' ? 'Sigla' : (activeTab === 'channels' ? 'Canal' : 'Identificação'))}</th>
+                        <th className="p-4 md:p-6 hidden md:table-cell">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado em' : (activeTab === 'sectors' ? 'Coordenador' : (activeTab === 'channels' ? 'Frequência' : 'Status/Info'))}</th>
+                        <th className="p-4 md:p-6">{activeTab === 'sectors' ? 'Canal' : (activeTab === 'users' ? 'Status de Acesso' : (activeTab === 'channels' ? 'Sinal' : ''))}</th>
+                        <th className="p-4 md:p-6 text-right">Ações</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -386,18 +382,41 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                         filteredData().map((item: any) => {
                             const channelInfo = activeTab === 'sectors' ? resolveChannelInfo(item.channelId) : null;
                             return (
-                                <tr key={item.id} className="hover:bg-brand-50/20 transition-colors group">
-                                    <td className="p-4">
-                                        {activeTab === 'events' && <div className="font-bold text-gray-900">{item.name}</div>}
-                                        {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
-                                            <span className="font-mono text-brand-600 font-black text-sm">{item.inventoryNumber}</span>
-                                        )}
-                                        {activeTab === 'inventory' && inventorySubTab === 'itens' && <span className="font-bold text-gray-900">{item.name}</span>}
-                                        {activeTab === 'sectors' && <div className="font-black text-gray-900 tracking-tighter text-base">{item.name}</div>}
-                                        {activeTab === 'channels' && <div className="font-black text-gray-900 font-mono">{item.name}</div>}
-                                        {activeTab === 'users' && <div className="font-bold text-gray-900 text-sm">{item.name}</div>}
+                                <tr key={item.id} className="hover:bg-brand-50/10 transition-colors group">
+                                    {/* COLUNA 1: IDENTIFICAÇÃO PRINCIPAL */}
+                                    <td className="p-4 md:p-6">
+                                        <div className="flex flex-col">
+                                            {activeTab === 'events' && <div className="font-bold text-gray-900">{item.name}</div>}
+                                            {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
+                                                <>
+                                                    <span className="font-mono text-brand-600 font-black text-sm">{item.inventoryNumber}</span>
+                                                    <span className="text-[10px] text-gray-400 uppercase font-bold md:hidden">{item.category} | {item.brand}</span>
+                                                </>
+                                            )}
+                                            {activeTab === 'inventory' && inventorySubTab === 'itens' && <span className="font-bold text-gray-900">{item.name}</span>}
+                                            {activeTab === 'sectors' && (
+                                                <>
+                                                    <div className="font-black text-gray-900 tracking-tighter text-base">{item.name}</div>
+                                                    <div className="text-[10px] text-brand-600 font-bold md:hidden">{item.coordinatorName}</div>
+                                                </>
+                                            )}
+                                            {activeTab === 'channels' && (
+                                                <>
+                                                    <div className="font-black text-gray-900 font-mono text-base">{item.name}</div>
+                                                    <div className="text-[10px] text-brand-600 font-bold md:hidden">{item.frequency} MHz</div>
+                                                </>
+                                            )}
+                                            {activeTab === 'users' && (
+                                                <>
+                                                    <div className="font-bold text-gray-900 text-sm">{item.name}</div>
+                                                    <div className="text-[10px] text-gray-400 font-mono md:hidden">{item.email}</div>
+                                                </>
+                                            )}
+                                        </div>
                                     </td>
-                                    <td className="p-4 text-sm">
+
+                                    {/* COLUNA 2: INFO SECUNDÁRIA (DESKTOP) */}
+                                    <td className="p-4 md:p-6 hidden md:table-cell text-sm">
                                         {activeTab === 'events' && <div className="text-gray-600 font-medium">{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>}
                                         {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-xs text-gray-500 uppercase font-bold">{item.category} | {item.brand} {item.model}</div>}
                                         {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="text-gray-500 font-mono text-xs"><Clock size={12} className="inline mr-1"/> {formatDate(item.createdAt)}</div>}
@@ -412,39 +431,43 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                         {activeTab === 'channels' && <div className="text-xs font-bold text-brand-600">{item.frequency} MHz</div>}
                                         {activeTab === 'users' && <div className="text-xs font-black text-brand-600 uppercase">{item.role}</div>}
                                     </td>
-                                    <td className="p-4">
+
+                                    {/* COLUNA 3: STATUS / VÍNCULOS (MOBILE & DESKTOP) */}
+                                    <td className="p-4 md:p-6">
                                         {activeTab === 'events' && (
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
                                                 {item.isActive ? 'Ativo' : 'Finalizado'}
                                             </span>
                                         )}
-                                        {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-[10px] text-gray-400 italic">Cad. em {formatDate(item.createdAt)}</div>}
-                                        {activeTab === 'inventory' && inventorySubTab === 'itens' && (
-                                            <div className="flex items-center gap-2 text-gray-700 font-bold text-xs uppercase">
-                                                <UserCheck size={14} className="text-brand-500" /> {resolveCreatorName(item.createdBy)}
-                                            </div>
-                                        )}
                                         {activeTab === 'users' && (
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                                            <button 
+                                                onClick={() => onUpdateUser({ ...item, isActive: !item.isActive })}
+                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
+                                                    item.isActive 
+                                                    ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-500/20' 
+                                                    : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200'
+                                                }`}
+                                            >
+                                                {item.isActive ? <Check size={12}/> : <X size={12}/>}
                                                 {item.isActive ? 'Ativo' : 'Inativo'}
-                                            </span>
+                                            </button>
                                         )}
                                         {activeTab === 'channels' && <div className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{item.type}</div>}
                                         {activeTab === 'sectors' && (
                                             channelInfo ? (
-                                                <div className="flex flex-col gap-0.5">
-                                                    <div className="flex items-center gap-2">
-                                                        <RadioIcon size={14} className="text-brand-500" />
-                                                        <span className="text-sm text-brand-600 font-black font-mono">{channelInfo.name}</span>
-                                                    </div>
-                                                    <div className="text-[10px] text-gray-400 uppercase font-bold pl-5">
-                                                        {channelInfo.frequency} MHz ({channelInfo.type})
+                                                <div className="flex items-center gap-2">
+                                                    <RadioIcon size={14} className="text-brand-500 flex-shrink-0" />
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs text-brand-600 font-black font-mono">{channelInfo.name}</span>
+                                                        <span className="text-[9px] text-gray-400 font-bold">{channelInfo.frequency} MHz</span>
                                                     </div>
                                                 </div>
-                                            ) : <span className="text-xs text-gray-300 italic">Não vinculado</span>
+                                            ) : <span className="text-[10px] text-gray-300 italic">S/ Vínculo</span>
                                         )}
                                     </td>
-                                    <td className="p-4 text-right space-x-1">
+
+                                    {/* COLUNA 4: AÇÕES */}
+                                    <td className="p-4 md:p-6 text-right space-x-1 whitespace-nowrap">
                                         <button 
                                             onClick={() => {
                                                 if (activeTab === 'events') setEventFormData({name: item.name, startDate: item.startDate, endDate: item.endDate, isActive: item.isActive});
