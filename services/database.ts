@@ -57,13 +57,10 @@ const mapRental = (r: any): Rental => ({
   radioModel: r.radio_model,
   serialNumber: r.serial_number,
   startDate: r.start_date,
-  // Fix: changed expected_return_date to expectedReturnDate to match Rental interface
   expectedReturnDate: r.expected_return_date,
-  // Fix: changed actual_return_date to actualReturnDate to match Rental interface
   actualReturnDate: r.actual_return_date,
   status: r.status as RentalStatus,
   notes: r.notes,
-  // Fix: changed registered_by to registeredBy to match Rental interface
   registeredBy: r.registered_by,
   accessories: r.accessories, 
   returnedAccessories: r.returned_accessories 
@@ -154,7 +151,7 @@ export const api = {
   },
   createEquipment: async (eq: Omit<Equipment, 'id'>) => {
     const { data, error } = await supabase.from('equipment').insert({
-        inventory_number: eq.inventory_number,
+        inventory_number: eq.inventoryNumber,
         name: eq.name,
         brand: eq.brand,
         model: eq.model,
@@ -254,7 +251,6 @@ export const api = {
           radio_model: rental.radioModel,
           serial_number: rental.serialNumber,
           start_date: rental.startDate,
-          // Fix: changed expected_return_date access to expectedReturnDate to match Rental interface
           expected_return_date: rental.expectedReturnDate,
           status: 'Ativo',
           notes: rental.notes,
