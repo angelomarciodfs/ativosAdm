@@ -9,11 +9,12 @@ import { ReportView } from './components/ReportView';
 import { ProfileView } from './components/ProfileView';
 import { LoginScreen } from './components/LoginScreen';
 import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories, EquipmentItem } from './types';
-import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, CheckCircle, Loader, Lightbulb, RefreshCw } from 'lucide-react';
+import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, CheckCircle, Loader, Lightbulb, RefreshCw, Menu } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { supabase, supabaseUrl, supabaseKey } from './services/supabaseClient';
 import { api } from './services/database';
 import { createClient } from '@supabase/supabase-js';
+import { SYSTEM_LOGO } from './constants';
 
 const InventoryStatusChart = ({ equipment, rentals, items }: { equipment: Equipment[], rentals: Rental[], currentEvent: Event | null, items: EquipmentItem[] }) => {
   const activeRentals = rentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
@@ -111,6 +112,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   
   const [configTab, setConfigTab] = useState<'events' | 'inventory' | 'sectors' | 'users'>('events');
   const [configInventorySubTab, setConfigInventorySubTab] = useState<'ativos' | 'itens'>('ativos');
@@ -124,24 +126,49 @@ const App: React.FC = () => {
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
   
   const loadAndVerifyUser = async (session: any) => {
-     if (!session?.user) return;
+     if (!session?.user) {
+        setIsAuthLoading(false);
+        return;
+     }
      try {
          const allUsers = await api.fetchUsers();
          let profile = allUsers.find(u => u.id === session.user.id);
          if (!profile) {
              const isFirstUser = allUsers.length === 0;
-             const recoveryProfile: User = { id: session.user.id, name: session.user.email?.split('@')[0] || 'Admin', email: session.user.email || '', role: isFirstUser ? 'ADMIN' : 'USER', avatarInitials: (session.user.email || 'AD').substring(0,2).toUpperCase() };
-             try { profile = await api.createProfile(recoveryProfile); setUsers(prev => [...prev, profile!]); } catch { profile = { ...recoveryProfile, role: 'ADMIN' }; }
+             const recoveryProfile: User = { 
+                id: session.user.id, 
+                name: session.user.email?.split('@')[0] || 'Admin', 
+                email: session.user.email || '', 
+                role: isFirstUser ? 'ADMIN' : 'USER', 
+                avatarInitials: (session.user.email || 'AD').substring(0,2).toUpperCase() 
+             };
+             try { 
+                profile = await api.createProfile(recoveryProfile); 
+                setUsers(prev => [...prev, profile!]); 
+             } catch { 
+                profile = { ...recoveryProfile, role: isFirstUser ? 'ADMIN' : 'USER' }; 
+             }
          }
          setCurrentUser(profile);
-     } catch (e) { console.error("Error profile", e); }
+     } catch (e) { 
+         console.error("Error profile", e); 
+     } finally {
+         setIsAuthLoading(false);
+     }
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => { if (session?.user) loadAndVerifyUser(session); });
+    supabase.auth.getSession().then(({ data: { session } }) => { 
+        if (session?.user) loadAndVerifyUser(session); 
+        else setIsAuthLoading(false);
+    });
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) loadAndVerifyUser(session);
-      else setCurrentUser(null);
+      else {
+          setCurrentUser(null);
+          setIsAuthLoading(false);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -266,8 +293,6 @@ const App: React.FC = () => {
             onUpdateUser={async (d) => { 
                 await api.updateProfile(d);
                 if (d.password) {
-                   // Nota: Supabase não permite troca de senha de terceiros via Auth regular sem Service Role Key ou Edge Function.
-                   // Se d.id === currentUser.id, o auth.updateUser funcionaria.
                    if (d.id === currentUser?.id) {
                       await supabase.auth.updateUser({ password: d.password });
                    } else {
@@ -302,10 +327,25 @@ const App: React.FC = () => {
     }
   };
 
+  if (isAuthLoading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-brand-600 gap-3"><Loader className="animate-spin" size={32}/> <span className="font-bold font-mono uppercase tracking-tighter">Autenticando...</span></div>;
+
   if (!currentUser) return <LoginScreen onLogin={async (email, password) => { const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) throw error; }} />;
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans flex-col md:flex-row">
+      {/* MOBILE TOP BAR */}
+      <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-sm">
+          <div className="flex items-center gap-3">
+              <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-gray-600 hover:text-brand-600 transition-colors">
+                  <Menu size={24} />
+              </button>
+              <img src={SYSTEM_LOGO} alt="Logo" className="h-8 w-auto" />
+          </div>
+          <div className="text-[10px] font-black uppercase text-brand-600 bg-brand-50 px-2 py-1 rounded border border-brand-100">
+              {currentUser.role}
+          </div>
+      </header>
+
       <Sidebar 
         currentView={view} 
         onChangeView={setView} 
@@ -314,9 +354,10 @@ const App: React.FC = () => {
         currentEvent={currentEvent} 
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
-        onProfileClick={() => setView('profile')}
+        onProfileClick={() => { setView('profile'); setIsSidebarOpen(false); }}
       />
-      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen relative">
+      
+      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto min-h-[calc(100vh-64px)] md:h-screen relative">
         <div className="max-w-7xl mx-auto">{renderContent()}</div>
       </main>
     </div>
