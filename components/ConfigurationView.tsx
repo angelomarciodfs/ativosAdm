@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Equipment, Sector, User, UserRole, Event, EquipmentItem } from '../types';
-import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Tags, Clock, UserCheck, AlertCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key } from 'lucide-react';
 
 interface ConfigurationViewProps {
   equipmentList: Equipment[];
@@ -24,7 +24,6 @@ interface ConfigurationViewProps {
   onAddEvent: (event: Omit<Event, 'id'>) => void;
   onUpdateEvent: (event: Event) => void;
   onDeleteEvent: (id: string) => void;
-  // Novas props para controle externo do estado
   activeTab: 'events' | 'inventory' | 'sectors' | 'users';
   setActiveTab: (tab: any) => void;
   inventorySubTab: 'ativos' | 'itens';
@@ -44,14 +43,14 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   
   // Form States
-  const [eqFormData, setEqFormData] = useState({ inventoryNumber: '', name: '', brand: '', model: '', category: '' });
+  const [eqFormData, setEqFormData] = useState({ inventoryNumber: '', brand: '', model: '', category: '' });
   const [itemFormData, setItemFormData] = useState({ name: '' });
   const [sectorFormData, setSectorFormData] = useState({ name: '', coordinatorName: '', coordinatorPhone: '' });
   const [userFormData, setUserFormData] = useState({ name: '', preferredName: '', email: '', phone: '', role: 'USER' as UserRole, password: '' });
   const [eventFormData, setEventFormData] = useState({ name: '', startDate: '', endDate: '', isActive: true });
 
   const resetForms = () => {
-    setEqFormData({ inventoryNumber: '', name: '', brand: '', model: '', category: '' });
+    setEqFormData({ inventoryNumber: '', brand: '', model: '', category: '' });
     setItemFormData({ name: '' });
     setSectorFormData({ name: '', coordinatorName: '', coordinatorPhone: '' });
     setUserFormData({ name: '', preferredName: '', email: '', phone: '', role: 'USER', password: '' });
@@ -66,11 +65,12 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
         if (editingId) onUpdateItem(editingId, itemFormData.name);
         else onAddItem(itemFormData.name);
     } else if (activeTab === 'inventory' && inventorySubTab === 'ativos') {
+        const finalData = { ...eqFormData, name: eqFormData.inventoryNumber };
         if (editingId) {
             const original = equipmentList.find(item => item.id === editingId);
-            onUpdateEquipment({ id: editingId, ...eqFormData, createdAt: original?.createdAt || new Date().toISOString().split('T')[0] });
+            onUpdateEquipment({ id: editingId, ...finalData, createdAt: original?.createdAt || new Date().toISOString().split('T')[0] });
         } else {
-            onAddEquipment({ ...eqFormData, createdAt: new Date().toISOString().split('T')[0] });
+            onAddEquipment({ ...finalData, createdAt: new Date().toISOString().split('T')[0] });
         }
     } else if (activeTab === 'sectors') {
         if (editingId) onUpdateSector({ id: editingId, ...sectorFormData });
@@ -91,7 +91,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     if (activeTab === 'sectors') return sectorList.filter(s => s.name.toLowerCase().includes(term));
     if (activeTab === 'users') return userList.filter(u => u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term));
     if (activeTab === 'inventory') {
-        if (inventorySubTab === 'ativos') return equipmentList.filter(eq => eq.inventoryNumber.toLowerCase().includes(term) || eq.name.toLowerCase().includes(term));
+        if (inventorySubTab === 'ativos') return equipmentList.filter(eq => eq.inventoryNumber.toLowerCase().includes(term));
         return itemList.filter(c => c.name.toLowerCase().includes(term));
     }
     return [];
@@ -191,10 +191,10 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                 )}
 
                 {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="space-y-1">
                             <label className="text-xs uppercase text-gray-500 font-bold flex justify-between items-center mb-1">
-                                ITEM (Tipo de Ativo)
+                                ITEM
                                 <button type="button" onClick={() => { setInventorySubTab('itens'); setIsAdding(true); setEditingId(null); }} className="text-brand-600 hover:text-brand-700 text-[9px] font-black border border-brand-200 px-1.5 rounded bg-brand-50 uppercase">NOVO ITEM +</button>
                             </label>
                             <select required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.category} onChange={e => setEqFormData({...eqFormData, category: e.target.value})}>
@@ -205,10 +205,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                         <div className="space-y-1">
                             <label className="text-xs uppercase text-brand-600 font-bold">Patrimônio / ID</label>
                             <input required type="text" placeholder="Ex: R-01" className="w-full bg-gray-50 border border-brand-200 rounded-lg p-3 font-mono font-bold" value={eqFormData.inventoryNumber} onChange={e => setEqFormData({...eqFormData, inventoryNumber: e.target.value.toUpperCase()})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Nome / Descrição</label>
-                            <input required type="text" placeholder="Ex: Rádio Coordenação" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.name} onChange={e => setEqFormData({...eqFormData, name: e.target.value})} />
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs uppercase text-gray-500 font-bold">Marca</label>
@@ -257,12 +253,20 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                             <label className="text-xs uppercase text-gray-500 font-bold">Email</label>
                             <input required type="email" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.email} onChange={e => setUserFormData({...userFormData, email: e.target.value})} disabled={!!editingId} />
                         </div>
-                        {!editingId && (
-                            <div className="space-y-1">
-                                <label className="text-xs uppercase text-gray-500 font-bold">Senha Inicial</label>
-                                <input required type="password" placeholder="Mínimo 6 caracteres" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.password} onChange={e => setUserFormData({...userFormData, password: e.target.value})} />
+                        <div className="space-y-1">
+                            <label className="text-xs uppercase text-gray-500 font-bold">{editingId ? 'Nova Senha (deixe vazio para não alterar)' : 'Senha Inicial'}</label>
+                            <div className="relative">
+                                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                <input 
+                                    type="password" 
+                                    placeholder="Mínimo 6 caracteres" 
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 pl-10" 
+                                    value={userFormData.password} 
+                                    onChange={e => setUserFormData({...userFormData, password: e.target.value})} 
+                                    required={!editingId}
+                                />
                             </div>
-                        )}
+                        </div>
                         <div className="space-y-1">
                             <label className="text-xs uppercase text-gray-500 font-bold">Perfil</label>
                             <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.role} onChange={e => setUserFormData({...userFormData, role: e.target.value as UserRole})}>
@@ -301,7 +305,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
              <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black">
-                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : 'Identificação Principal'}</th>
+                        <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Nome do ITEM' : 'Patrimônio / ID'}</th>
                         <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Data de Criação' : 'Datas / Info'}</th>
                         <th className="p-4">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado por' : 'Status / Vínculo'}</th>
                         <th className="p-4 text-right">Ações</th>
@@ -316,10 +320,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                 <td className="p-4">
                                     {activeTab === 'events' && <div className="font-bold text-gray-900">{item.name}</div>}
                                     {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
-                                        <div className="flex flex-col">
-                                            <span className="font-mono text-brand-600 font-black text-sm">{item.inventoryNumber}</span>
-                                            <span className="text-xs text-gray-900 font-bold">{item.name}</span>
-                                        </div>
+                                        <span className="font-mono text-brand-600 font-black text-sm">{item.inventoryNumber}</span>
                                     )}
                                     {activeTab === 'inventory' && inventorySubTab === 'itens' && <span className="font-bold text-gray-900">{item.name}</span>}
                                     {activeTab === 'sectors' && <div className="font-black text-gray-900 tracking-tighter">{item.name}</div>}
@@ -351,7 +352,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                     <button 
                                         onClick={() => {
                                             if (activeTab === 'events') setEventFormData({name: item.name, startDate: item.startDate, endDate: item.endDate, isActive: item.isActive});
-                                            if (activeTab === 'inventory' && inventorySubTab === 'ativos') setEqFormData({inventoryNumber: item.inventoryNumber, name: item.name, brand: item.brand, model: item.model, category: item.category});
+                                            if (activeTab === 'inventory' && inventorySubTab === 'ativos') setEqFormData({inventoryNumber: item.inventoryNumber, brand: item.brand, model: item.model, category: item.category});
                                             if (activeTab === 'inventory' && inventorySubTab === 'itens') setItemFormData({name: item.name});
                                             if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || ''});
                                             if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: ''});

@@ -73,7 +73,7 @@ export interface DashboardStats {
   utilizationRate: number;
 }
 
-export type ViewState = 'dashboard' | 'rentals' | 'new-rental' | 'history' | 'settings' | 'reports';
+export type ViewState = 'dashboard' | 'rentals' | 'new-rental' | 'history' | 'settings' | 'reports' | 'profile';
 
 export type UserRole = 'ADMIN' | 'USER';
 

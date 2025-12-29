@@ -6,6 +6,7 @@ import { RentalList } from './components/RentalList';
 import { RentalForm } from './components/RentalForm';
 import { ConfigurationView } from './components/ConfigurationView';
 import { ReportView } from './components/ReportView';
+import { ProfileView } from './components/ProfileView';
 import { LoginScreen } from './components/LoginScreen';
 import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories, EquipmentItem } from './types';
 import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, CheckCircle, Loader, Lightbulb, RefreshCw } from 'lucide-react';
@@ -111,7 +112,6 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   
-  // Persistência de abas para as configurações
   const [configTab, setConfigTab] = useState<'events' | 'inventory' | 'sectors' | 'users'>('events');
   const [configInventorySubTab, setConfigInventorySubTab] = useState<'ativos' | 'itens'>('ativos');
 
@@ -207,7 +207,6 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    // Só exibe loader em tela cheia na primeira carga, depois usa overlay se necessário
     if (isLoadingData && rentals.length === 0) return <div className="h-full flex items-center justify-center text-brand-600 gap-4"><Loader className="animate-spin" size={32}/> <span className="font-bold font-mono tracking-tighter uppercase">Sincronizando Banco de Dados...</span></div>;
     
     switch (view) {
@@ -270,21 +269,41 @@ const App: React.FC = () => {
             onAddEvent={async (d) => { await api.createEvent(d); await fetchData(); }} 
             onUpdateEvent={async (d) => { await api.updateEvent(d); await fetchData(); }} 
             onDeleteEvent={() => {}}
-            // Passando o estado controlado de abas
             activeTab={configTab}
             setActiveTab={setConfigTab}
             inventorySubTab={configInventorySubTab}
             setInventorySubTab={setConfigInventorySubTab}
         />;
+      case 'profile':
+        return <ProfileView 
+            user={currentUser} 
+            onUpdateProfile={async (data) => { 
+              await api.updateProfile({ ...currentUser!, ...data });
+              fetchData();
+            }}
+            onUpdatePassword={async (newPassword) => {
+              const { error } = await supabase.auth.updateUser({ password: newPassword });
+              if (error) throw error;
+            }}
+        />;
       default: return <div>View not found</div>;
     }
   };
 
-  if (!currentUser) return <LoginScreen onLogin={async (e, p) => { const { error } = await supabase.auth.signInWithPassword({ email: e, password: p }); if (error) throw error; }} />;
+  if (!currentUser) return <LoginScreen onLogin={async (email, password) => { const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) throw error; }} />;
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans flex-col md:flex-row">
-      <Sidebar currentView={view} onChangeView={setView} currentUser={currentUser} onLogout={() => supabase.auth.signOut()} currentEvent={currentEvent} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <Sidebar 
+        currentView={view} 
+        onChangeView={setView} 
+        currentUser={currentUser} 
+        onLogout={() => supabase.auth.signOut()} 
+        currentEvent={currentEvent} 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+        onProfileClick={() => setView('profile')}
+      />
       <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen relative">
         <div className="max-w-7xl mx-auto">{renderContent()}</div>
       </main>
