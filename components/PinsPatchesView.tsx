@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MerchandiseItem, Legendario, ImportPreviewData, User } from '../types';
 import { api } from '../services/database';
 import { Search, Upload, CheckCircle, Circle, AlertTriangle, X, Check, Loader, FileSpreadsheet } from 'lucide-react';
@@ -21,55 +21,61 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
   const [importPreview, setImportPreview] = useState<ImportPreviewData[]>([]);
   const [isImporting, setIsImporting] = useState(false);
 
-  useEffect(() => {
-    loadInitialData();
+  // Função centralizada para buscar legendários
+  const fetchLegendarios = useCallback(async (term: string) => {
+    try {
+        setLoading(true);
+        // Busca no banco. Se term for vazio, a API retorna os primeiros 50 registros por padrão.
+        const data = await api.searchLegendarios(term);
+        // Ordenação alfabética no front para garantir consistência visual
+        const sortedData = data.sort((a: Legendario, b: Legendario) => a.name.localeCompare(b.name));
+        setLegendarios(sortedData);
+    } catch (error) {
+        console.error("Erro ao buscar legendários", error);
+    } finally {
+        setLoading(false);
+    }
   }, []);
 
-  const loadInitialData = async () => {
-    try {
-      setLoading(true);
-      const items = await api.fetchMerchandise();
-      setMerchandise(items);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Carregar dados iniciais (Estoque e Lista de Pessoas)
   useEffect(() => {
-    if (searchTerm.length > 2) {
-      const delayDebounceFn = setTimeout(() => {
-        api.searchLegendarios(searchTerm).then(data => {
-            // Ordenar alfabeticamente o resultado da busca
-            const sortedData = data.sort((a: Legendario, b: Legendario) => a.name.localeCompare(b.name));
-            setLegendarios(sortedData);
-        });
-      }, 500);
-      return () => clearTimeout(delayDebounceFn);
-    } else if (searchTerm.length === 0) {
-      setLegendarios([]);
-    }
-  }, [searchTerm]);
+    const init = async () => {
+        setLoading(true);
+        try {
+            const items = await api.fetchMerchandise();
+            setMerchandise(items);
+            // Carrega lista inicial vazia ou completa
+            await fetchLegendarios(''); 
+        } finally {
+            setLoading(false);
+        }
+    };
+    init();
+  }, [fetchLegendarios]);
+
+  // Efeito de Busca (Debounce)
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchLegendarios(searchTerm);
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, fetchLegendarios]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const candidates: ImportPreviewData[] = [];
-    const seenCPFs = new Set<string>(); // Set para evitar duplicatas dentro do próprio arquivo
+    const seenCPFs = new Set<string>();
 
     try {
         if (file.name.endsWith('.xlsx')) {
-            // Lógica para Excel (.xlsx)
             const rows = await readXlsxFile(file);
-            
-            // Mapeamento específico solicitado:
-            // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9
             const IDX_CPF = 5;      // Coluna F
             const IDX_NAME = 7;     // Coluna H
             const IDX_EMAIL = 8;    // Coluna I
             const IDX_PHONE = 9;    // Coluna J
 
-            // Assumindo que a linha 0 é o cabeçalho, começamos do 1
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
                 if (!row || row.length === 0) continue;
@@ -79,11 +85,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                 const email = row[IDX_EMAIL] ? String(row[IDX_EMAIL]).trim() : '';
                 const phone = row[IDX_PHONE] ? String(row[IDX_PHONE]).trim() : '';
 
-                // Validamos se existe pelo menos Nome e CPF para importar
                 if (cpfRaw && name) {
-                    // Se já processamos este CPF neste arquivo, ignoramos a duplicata
                     if (seenCPFs.has(cpfRaw)) continue;
-                    
                     seenCPFs.add(cpfRaw);
                     candidates.push({
                         cpf: cpfRaw,
@@ -97,23 +100,17 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                 }
             }
         } else {
-            // Lógica para CSV (Mantida padrão ou ajustável se necessário)
             const text = await file.text();
             const lines = text.split('\n').filter(line => line.trim() !== '');
-            
-            for (let i = 1; i < lines.length; i++) { // Skip header
+            for (let i = 1; i < lines.length; i++) { 
                const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
                if (cols.length < 2) continue; 
-               
-               // Ordem esperada no CSV simples: CPF, NOME, EMAIL, TELEFONE
                const cpfRaw = cols[0] || '';
                const name = cols[1] || '';
                const email = cols[2] || '';
                const phone = cols[3] || '';
-               
                if (cpfRaw && name) {
                    if (seenCPFs.has(cpfRaw)) continue;
-
                    seenCPFs.add(cpfRaw);
                    candidates.push({
                        cpf: cpfRaw,
@@ -133,19 +130,18 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
             return;
         }
 
-        // Check DB for duplicates (Banco de Dados)
         const cpfsToCheck = candidates.map(c => c.cpf);
         const existingCPFs = await api.checkExistingCPFs(cpfsToCheck);
         
         const processedCandidates = candidates.map(c => ({
             ...c,
             exists: existingCPFs.includes(c.cpf),
-            selected: !existingCPFs.includes(c.cpf) // Auto-deselect existing
-        })).sort((a, b) => a.name.localeCompare(b.name)); // Ordenar alfabeticamente no Modal
+            selected: !existingCPFs.includes(c.cpf)
+        })).sort((a, b) => a.name.localeCompare(b.name));
 
         setImportPreview(processedCandidates);
         setIsImportModalOpen(true);
-        e.target.value = ''; // Reset input
+        e.target.value = ''; 
 
     } catch (error) {
         console.error("Erro ao processar arquivo:", error);
@@ -153,14 +149,12 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
     }
   };
 
-  // Lógica de Seleção em Massa
   const validImportItems = importPreview.filter(i => !i.exists);
   const isAllSelected = validImportItems.length > 0 && validImportItems.every(i => i.selected);
 
   const toggleSelectAll = () => {
     const newState = !isAllSelected;
     setImportPreview(prev => prev.map(item => {
-        // Não altera itens que já existem no banco (duplicados)
         if (item.exists) return item;
         return { ...item, selected: newState };
     }));
@@ -172,7 +166,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
           const toImport = importPreview.filter(c => c.selected);
           await api.importLegendarios(toImport);
           setIsImportModalOpen(false);
-          setSearchTerm(''); // Reset search
+          setSearchTerm(''); // Limpa a busca para forçar recarregamento da lista completa
+          fetchLegendarios(''); // Força refresh imediato
           alert(`${toImport.length} legendários importados com sucesso!`);
       } catch (err) {
           console.error(err);
@@ -255,18 +250,21 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
       <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
          <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Resultados da Busca</span>
-             <span className="text-xs font-bold text-gray-400">{legendarios.length} encontrados</span>
+             <span className="text-xs font-bold text-gray-400">
+                {loading ? 'Carregando...' : `${legendarios.length} encontrados`}
+             </span>
          </div>
          <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-             {legendarios.length === 0 ? (
+             {legendarios.length === 0 && !loading ? (
                  <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50 min-h-[200px]">
                      <Search size={48} className="mb-4" />
-                     <p className="font-medium text-center px-4">Busque por um legendário para gerenciar entregas.</p>
+                     <p className="font-medium text-center px-4">Nenhum legendário encontrado.</p>
                  </div>
              ) : (
                  <div className="space-y-2">
                      {legendarios.map(leg => (
                          <div key={leg.id} className="p-4 rounded-xl border border-gray-100 bg-white shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 hover:border-brand-200 hover:shadow-md transition-all">
+                             {/* Informações do Legendário */}
                              <div className="flex-1 min-w-0 text-center md:text-left w-full md:w-auto">
                                  <h4 className="text-lg font-bold text-gray-900 truncate">{leg.name}</h4>
                                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 text-sm text-gray-500 mt-1">
@@ -276,8 +274,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                  </div>
                              </div>
                              
-                             {/* Botões de Entrega Responsivos */}
-                             <div className="flex items-center gap-2 flex-wrap justify-center w-full md:w-auto">
+                             {/* Botões de Entrega (Flags) - Alinhados à direita */}
+                             <div className="flex items-center gap-2 flex-wrap justify-center md:justify-end w-full md:w-auto">
                                  {merchandise.map(item => {
                                      const isDelivered = !!leg.deliveries?.[item.id];
                                      const deliveryDate = isDelivered ? new Date(leg.deliveries![item.id]).toLocaleString('pt-BR') : '';
@@ -287,10 +285,10 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                             key={item.id}
                                             onClick={() => !isDelivered && handleDelivery(leg, item)}
                                             disabled={isDelivered || item.currentStock <= 0}
-                                            title={isDelivered ? `Entregue em: ${deliveryDate}` : (item.currentStock <= 0 ? 'Sem Estoque' : 'Entregar Item')}
+                                            title={isDelivered ? `Entregue em: ${deliveryDate}` : (item.currentStock <= 0 ? 'Sem Estoque' : `Entregar ${item.name}`)}
                                             className={`
                                                 relative group flex flex-col items-center justify-center rounded-xl border-2 transition-all duration-200
-                                                w-16 h-16 md:w-20 md:h-20
+                                                w-14 h-14 md:w-16 md:h-16
                                                 ${isDelivered 
                                                     ? 'bg-emerald-50 border-emerald-500 text-emerald-600' 
                                                     : (item.currentStock <= 0 
@@ -299,12 +297,12 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                                 }
                                             `}
                                          >
-                                             {isDelivered ? <CheckCircle size={20} className="mb-1 md:w-6 md:h-6" /> : <Circle size={20} className="mb-1 md:w-6 md:h-6" />}
-                                             <span className="text-[9px] md:text-[10px] font-bold text-center leading-tight px-1 line-clamp-2">{item.name}</span>
+                                             {isDelivered ? <CheckCircle size={20} className="mb-1" /> : <Circle size={20} className="mb-1" />}
+                                             <span className="text-[8px] md:text-[9px] font-bold text-center leading-tight px-0.5 line-clamp-2 uppercase tracking-tight">{item.name}</span>
                                              
                                              {/* Tooltip for Date */}
                                              {isDelivered && (
-                                                 <div className="absolute bottom-full mb-2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10 shadow-xl">
+                                                 <div className="absolute bottom-full mb-2 right-0 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10 shadow-xl">
                                                      {deliveryDate}
                                                  </div>
                                              )}
