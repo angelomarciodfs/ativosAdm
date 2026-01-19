@@ -177,28 +177,53 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
       }
   };
 
-  const handleDelivery = async (legendario: Legendario, item: MerchandiseItem) => {
+  const handleToggleDelivery = async (legendario: Legendario, item: MerchandiseItem) => {
     if (!currentUser) return;
+    const isDelivered = !!legendario.deliveries?.[item.id];
+
     try {
-        await api.deliverItem(legendario.id, item.id, currentUser.id);
-        // Optimistic Update
-        const now = new Date().toISOString();
-        setLegendarios(prev => prev.map(l => {
-            if (l.id === legendario.id) {
-                return {
-                    ...l,
-                    deliveries: { ...l.deliveries, [item.id]: now }
-                };
-            }
-            return l;
-        }));
-        // Update stock display locally
-        setMerchandise(prev => prev.map(m => {
-            if (m.id === item.id) return { ...m, currentStock: m.currentStock - 1 };
-            return m;
-        }));
+        if (isDelivered) {
+            // Lógica de Cancelamento (Undo)
+            await api.undoDelivery(legendario.id, item.id);
+            
+            // Atualização Otimista: Remove a entrega e devolve estoque
+            setLegendarios(prev => prev.map(l => {
+                if (l.id === legendario.id) {
+                    const newDeliveries = { ...l.deliveries };
+                    delete newDeliveries[item.id];
+                    return { ...l, deliveries: newDeliveries };
+                }
+                return l;
+            }));
+            
+            setMerchandise(prev => prev.map(m => {
+                if (m.id === item.id) return { ...m, currentStock: m.currentStock + 1 };
+                return m;
+            }));
+
+        } else {
+            // Lógica de Entrega
+            await api.deliverItem(legendario.id, item.id, currentUser.id);
+            
+            // Atualização Otimista: Adiciona entrega e baixa estoque
+            const now = new Date().toISOString();
+            setLegendarios(prev => prev.map(l => {
+                if (l.id === legendario.id) {
+                    return {
+                        ...l,
+                        deliveries: { ...l.deliveries, [item.id]: now }
+                    };
+                }
+                return l;
+            }));
+
+            setMerchandise(prev => prev.map(m => {
+                if (m.id === item.id) return { ...m, currentStock: m.currentStock - 1 };
+                return m;
+            }));
+        }
     } catch (error: any) {
-        alert(error.message || "Erro ao registrar entrega.");
+        alert(error.message || "Erro ao processar a ação.");
     }
   };
 
@@ -283,21 +308,25 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                      return (
                                          <button
                                             key={item.id}
-                                            onClick={() => !isDelivered && handleDelivery(leg, item)}
-                                            disabled={isDelivered || item.currentStock <= 0}
-                                            title={isDelivered ? `Entregue em: ${deliveryDate}` : (item.currentStock <= 0 ? 'Sem Estoque' : `Entregar ${item.name}`)}
+                                            onClick={() => handleToggleDelivery(leg, item)}
+                                            // Desabilitado apenas se não estiver entregue E não tiver estoque. Se já estiver entregue, permite clicar para desfazer.
+                                            disabled={!isDelivered && item.currentStock <= 0}
+                                            title={isDelivered ? `Entregue em: ${deliveryDate} (Clique para desfazer)` : (item.currentStock <= 0 ? 'Sem Estoque' : `Entregar ${item.name}`)}
                                             className={`
                                                 relative group flex flex-col items-center justify-center rounded-xl border-2 transition-all duration-200
                                                 w-14 h-14 md:w-16 md:h-16
                                                 ${isDelivered 
-                                                    ? 'bg-emerald-50 border-emerald-500 text-emerald-600' 
+                                                    ? 'bg-emerald-50 border-emerald-500 text-emerald-600 hover:bg-red-50 hover:border-red-500 hover:text-red-500' // Hover vermelho para indicar cancelamento
                                                     : (item.currentStock <= 0 
                                                         ? 'bg-gray-100 border-gray-200 text-gray-300 cursor-not-allowed'
                                                         : 'bg-white border-gray-200 text-gray-400 hover:border-brand-500 hover:text-brand-500 hover:shadow-lg hover:scale-105 active:scale-95')
                                                 }
                                             `}
                                          >
-                                             {isDelivered ? <CheckCircle size={20} className="mb-1" /> : <Circle size={20} className="mb-1" />}
+                                             {isDelivered ? <CheckCircle size={20} className="mb-1 group-hover:hidden" /> : <Circle size={20} className="mb-1" />}
+                                             {/* Ícone de X aparece no hover quando já está entregue */}
+                                             {isDelivered && <X size={20} className="mb-1 hidden group-hover:block" />}
+                                             
                                              <span className="text-[8px] md:text-[9px] font-bold text-center leading-tight px-0.5 line-clamp-2 uppercase tracking-tight">{item.name}</span>
                                              
                                              {/* Tooltip for Date */}

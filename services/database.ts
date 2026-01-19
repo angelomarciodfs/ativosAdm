@@ -419,5 +419,21 @@ export const api = {
 
     if (error) throw error;
     return new Date().toISOString();
+  },
+
+  // Cancelar entrega (Undo)
+  undoDelivery: async (legendarioId: string, merchandiseId: string) => {
+    // 1. Remover registro de entrega
+    const { error } = await supabase.from('deliveries')
+        .delete()
+        .match({ legendario_id: legendarioId, merchandise_id: merchandiseId });
+    
+    if (error) throw error;
+
+    // 2. Incrementar estoque (Devolver item)
+    const { data: item } = await supabase.from('merchandise').select('current_stock').eq('id', merchandiseId).single();
+    if (item) {
+        await supabase.from('merchandise').update({ current_stock: item.current_stock + 1 }).eq('id', merchandiseId);
+    }
   }
 };
