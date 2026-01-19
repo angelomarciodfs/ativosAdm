@@ -8,8 +8,9 @@ import { ConfigurationView } from './components/ConfigurationView';
 import { ReportView } from './components/ReportView';
 import { ProfileView } from './components/ProfileView';
 import { LoginScreen } from './components/LoginScreen';
-import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories, EquipmentItem, Channel } from './types';
-import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, CheckCircle, Loader, Lightbulb, RefreshCw, Menu } from 'lucide-react';
+import { PinsPatchesView } from './components/PinsPatchesView';
+import { Rental, ViewState, RentalStatus, Equipment, User, Sector, Event, RentalAccessories, EquipmentItem, Channel, MerchandiseItem } from './types';
+import { Radio, AlertTriangle, Activity, Package, PieChart, Headphones, Battery, Zap, CheckCircle, Loader, Lightbulb, RefreshCw, Menu, Tag, AlertCircle } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { supabase, supabaseUrl, supabaseKey } from './services/supabaseClient';
 import { api } from './services/database';
@@ -114,7 +115,7 @@ const App: React.FC = () => {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   
-  const [configTab, setConfigTab] = useState<'events' | 'inventory' | 'sectors' | 'users' | 'channels'>('events');
+  const [configTab, setConfigTab] = useState<'events' | 'inventory' | 'sectors' | 'users' | 'channels' | 'stock'>('events');
   const [configInventorySubTab, setConfigInventorySubTab] = useState<'ativos' | 'itens'>('ativos');
 
   const [rentals, setRentals] = useState<Rental[]>([]);
@@ -124,6 +125,7 @@ const App: React.FC = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [merchandiseList, setMerchandiseList] = useState<MerchandiseItem[]>([]);
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
   
   const loadAndVerifyUser = async (session: any) => {
@@ -190,14 +192,15 @@ const App: React.FC = () => {
           const loadSafe = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => { 
               try { return await promise || fallback; } catch (e) { return fallback; } 
           };
-          const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedItems, loadedChannels] = await Promise.all([
+          const [loadedEvents, loadedEq, loadedSectors, loadedRentals, loadedUsers, loadedItems, loadedChannels, loadedMerch] = await Promise.all([
               loadSafe(api.fetchEvents(), []),
               loadSafe(api.fetchEquipment(), []),
               loadSafe(api.fetchSectors(), []),
               loadSafe(api.fetchRentals(), []),
               loadSafe(api.fetchUsers(), []),
               loadSafe(api.fetchItems(), []),
-              loadSafe(api.fetchChannels(), [])
+              loadSafe(api.fetchChannels(), []),
+              loadSafe(api.fetchMerchandise(), [])
           ]);
           setEvents(loadedEvents);
           setEquipmentList(loadedEq);
@@ -206,6 +209,7 @@ const App: React.FC = () => {
           setItems(loadedItems);
           setUsers(loadedUsers);
           setChannels(loadedChannels);
+          setMerchandiseList(loadedMerch);
           const active = loadedEvents.find(e => e.isActive) || (loadedEvents.length > 0 ? loadedEvents[0] : null);
           if (active) setCurrentEventId(active.id);
       } finally { setIsLoadingData(false); }
@@ -258,12 +262,50 @@ const App: React.FC = () => {
                   <p className="text-gray-500 mt-1 text-sm md:text-base">{currentEvent ? <>Evento Selecionado: <span className="text-brand-600 font-black">{currentEvent.name}</span></> : "Selecione um evento nas configurações."}</p>
                </div>
             </div>
+            
+            {/* KPI CARDS */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
               <StatCard title="Em Uso" value={stats.totalActive} icon={<Radio size={20} />} color="brand" />
               <StatCard title="Atrasos" value={stats.totalOverdue} icon={<AlertTriangle size={20} />} color="red" />
               <StatCard title="Parciais" value={stats.totalPartial} icon={<CheckCircle size={20} />} color="blue" />
               <StatCard title="% Utilização" value={`${stats.utilizationRate}%`} icon={<Activity size={20} />} color="green" />
             </div>
+
+            {/* MERCHANDISE STOCK SECTION */}
+            <div className="space-y-3">
+                <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold flex items-center gap-2">
+                    <Tag size={16} /> Estoque de Materiais
+                </h3>
+                {merchandiseList.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {merchandiseList.map(item => {
+                            const isLow = item.currentStock <= item.minThreshold;
+                            return (
+                                <div key={item.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between hover:border-brand-300 transition-colors">
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">{item.name}</p>
+                                        <div className="flex items-end gap-1.5">
+                                            <p className={`text-2xl font-black ${isLow ? 'text-red-600' : 'text-gray-900'}`}>
+                                                {item.currentStock}
+                                            </p>
+                                            {isLow && <AlertCircle size={14} className="text-red-500 mb-1.5 animate-pulse" />}
+                                        </div>
+                                    </div>
+                                    <div className={`p-2.5 rounded-lg ${isLow ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400'}`}>
+                                        <Package size={20} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="bg-gray-50 border border-gray-200 border-dashed rounded-xl p-6 text-center text-gray-400 text-sm">
+                        Nenhum item de estoque cadastrado. Vá em Configurações &gt; Estoque.
+                    </div>
+                )}
+            </div>
+
+            {/* CHARTS SECTION */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
                 <h3 className="text-[11px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2 tracking-widest"><Zap size={14} className="text-brand-600" /> Inventário por ITEM</h3>
@@ -280,6 +322,7 @@ const App: React.FC = () => {
       case 'history': return <RentalList rentals={eventRentals} onReturn={handleReturn} filter="history" />;
       case 'reports': return <ReportView rentals={rentals} equipment={equipmentList} currentUser={currentUser} currentEvent={currentEvent} sectors={sectors} />;
       case 'new-rental': return <RentalForm onCancel={() => setView('rentals')} onSubmit={handleCreateRental} availableEquipment={equipmentList} sectors={sectors} activeEventId={currentEventId || ''} />;
+      case 'pins-patches': return <PinsPatchesView currentUser={currentUser} />;
       case 'settings':
         return <ConfigurationView 
             equipmentList={equipmentList} 

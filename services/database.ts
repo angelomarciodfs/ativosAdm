@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, EquipmentItem, Channel } from '../types';
+import { Equipment, Sector, User, Event, Rental, RentalStatus, UserRole, EquipmentItem, Channel, MerchandiseItem, Legendario } from '../types';
 
 // --- HELPERS DE CONVERSÃO ---
 
@@ -71,6 +71,23 @@ const mapRental = (r: any): Rental => ({
   accessories: r.accessories, 
   returnedAccessories: r.returned_accessories,
   radioModel: r.radio_model
+});
+
+const mapMerchandise = (m: any): MerchandiseItem => ({
+  id: m.id,
+  name: m.name,
+  currentStock: m.current_stock,
+  minThreshold: m.min_threshold
+});
+
+const mapLegendario = (l: any): Legendario => ({
+  id: l.id,
+  cpf: l.cpf,
+  name: l.name,
+  email: l.email,
+  phone: l.phone,
+  registrationNumber: l.registration_number,
+  deliveries: {} // Será populado separadamente ou via join
 });
 
 // --- API METHODS ---
@@ -297,5 +314,110 @@ export const api = {
       const { data, error } = await supabase.from('rentals').update(updates).eq('id', id).select();
       if (error) throw error;
       return mapRental(data[0]);
+  },
+
+  // --- NOVOS MÉTODOS PINS & PATCHES ---
+  
+  fetchMerchandise: async () => {
+    const { data, error } = await supabase.from('merchandise').select('*').order('name');
+    if (error) throw error;
+    return (data || []).map(mapMerchandise);
+  },
+  createMerchandise: async (item: Omit<MerchandiseItem, 'id'>) => {
+    const { data, error } = await supabase.from('merchandise').insert({
+      name: item.name,
+      current_stock: item.currentStock,
+      min_threshold: item.minThreshold
+    }).select().single();
+    if (error) throw error;
+    return mapMerchandise(data);
+  },
+  updateMerchandise: async (item: MerchandiseItem) => {
+    const { data, error } = await supabase.from('merchandise').update({
+      name: item.name,
+      current_stock: item.currentStock,
+      min_threshold: item.minThreshold
+    }).eq('id', item.id).select().single();
+    if (error) throw error;
+    return mapMerchandise(data);
+  },
+  deleteMerchandise: async (id: string) => {
+    const { error } = await supabase.from('merchandise').delete().eq('id', id);
+    if (error) throw error;
+  },
+  
+  // Buscar Legendários (e suas entregas)
+  searchLegendarios: async (term: string) => {
+    const termLike = `%${term}%`;
+    const { data, error } = await supabase
+      .from('legendarios')
+      .select(`
+        *,
+        deliveries ( merchandise_id, delivered_at )
+      `)
+      .or(`name.ilike.${termLike},cpf.ilike.${termLike},registration_number.ilike.${termLike}`)
+      .limit(50);
+      
+    if (error) throw error;
+
+    return (data || []).map((l: any) => {
+      const leg = mapLegendario(l);
+      // Mapear entregas para um objeto { item_id: data_entrega }
+      leg.deliveries = {};
+      if (l.deliveries && Array.isArray(l.deliveries)) {
+        l.deliveries.forEach((d: any) => {
+           leg.deliveries![d.merchandise_id] = d.delivered_at;
+        });
+      }
+      return leg;
+    });
+  },
+
+  // Importação em massa
+  importLegendarios: async (legendarios: Omit<Legendario, 'id'>[]) => {
+    const { data, error } = await supabase.from('legendarios').insert(
+      legendarios.map(l => ({
+        cpf: l.cpf,
+        name: l.name,
+        email: l.email,
+        phone: l.phone,
+        registration_number: l.registrationNumber
+      }))
+    ).select();
+    if (error) throw error;
+    return data.length;
+  },
+
+  // Verificar CPFs existentes para importação
+  checkExistingCPFs: async (cpfs: string[]) => {
+    const { data, error } = await supabase.from('legendarios').select('cpf').in('cpf', cpfs);
+    if (error) throw error;
+    return (data || []).map((i: any) => i.cpf);
+  },
+
+  // Registrar entrega
+  deliverItem: async (legendarioId: string, merchandiseId: string, userId: string) => {
+    // 1. Decrementar estoque
+    const { error: stockError } = await supabase.rpc('decrement_stock', { item_id: merchandiseId });
+    // Se a função RPC não existir, fazemos via update normal (menos seguro para concorrência, mas funcional)
+    if (stockError) {
+       // Fallback: Ler e atualizar
+       const { data: item } = await supabase.from('merchandise').select('current_stock').eq('id', merchandiseId).single();
+       if (item && item.current_stock > 0) {
+          await supabase.from('merchandise').update({ current_stock: item.current_stock - 1 }).eq('id', merchandiseId);
+       } else {
+          throw new Error("Estoque insuficiente");
+       }
+    }
+
+    // 2. Registrar entrega
+    const { error } = await supabase.from('deliveries').insert({
+      legendario_id: legendarioId,
+      merchandise_id: merchandiseId,
+      delivered_by: userId
+    });
+
+    if (error) throw error;
+    return new Date().toISOString();
   }
 };

@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { LayoutDashboard, Radio, History, PlusCircle, Settings, LogOut, ClipboardList, Calendar, X, ArrowDownCircle, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Radio, History, PlusCircle, Settings, LogOut, ClipboardList, Calendar, X, ArrowDownCircle, ChevronRight, Tag } from 'lucide-react';
 import { ViewState, User, Event } from '../types';
 import { SYSTEM_LOGO } from '../constants';
 
@@ -20,6 +21,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, cur
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
     { id: 'rentals', label: 'Locações Ativas', icon: Radio, visible: true },
+    { id: 'pins-patches', label: 'Pins & Patches', icon: Tag, visible: true },
     { id: 'reports', label: 'Relatório Evento', icon: ClipboardList, visible: true },
     { id: 'history', label: 'Histórico', icon: History, visible: true },
     { id: 'settings', label: 'Configurações', icon: Settings, visible: isAdmin }, // Only Admin

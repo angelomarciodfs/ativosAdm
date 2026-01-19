@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { Equipment, Sector, User, UserRole, Event, EquipmentItem, Channel } from '../types';
-import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key, Radio as RadioIcon, Activity, Phone, Power, Check, X } from 'lucide-react';
+import { Equipment, Sector, User, UserRole, Event, EquipmentItem, Channel, MerchandiseItem } from '../types';
+import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key, Radio as RadioIcon, Activity, Phone, Power, Check, X, Tag } from 'lucide-react';
+import { api } from '../services/database';
 
 interface ConfigurationViewProps {
   equipmentList: Equipment[];
@@ -28,7 +29,7 @@ interface ConfigurationViewProps {
   onAddEvent: (event: Omit<Event, 'id'>) => void;
   onUpdateEvent: (event: Event) => void;
   onDeleteEvent: (id: string) => void;
-  activeTab: 'events' | 'inventory' | 'sectors' | 'users' | 'channels';
+  activeTab: 'events' | 'inventory' | 'sectors' | 'users' | 'channels' | 'stock';
   setActiveTab: (tab: any) => void;
   inventorySubTab: 'ativos' | 'itens';
   setInventorySubTab: (tab: any) => void;
@@ -47,6 +48,10 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Stock State (Loaded internally since it's only used here for config)
+  const [merchandiseList, setMerchandiseList] = useState<MerchandiseItem[]>([]);
+  const [loadingStock, setLoadingStock] = useState(false);
+
   // Form States
   const [eqFormData, setEqFormData] = useState({ inventoryNumber: '', brand: '', model: '', category: '' });
   const [itemFormData, setItemFormData] = useState({ name: '' });
@@ -54,6 +59,15 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   const [channelFormData, setChannelFormData] = useState({ name: '', frequency: '', type: 'VHF' });
   const [userFormData, setUserFormData] = useState({ name: '', preferredName: '', email: '', phone: '', role: 'USER' as UserRole, password: '', isActive: true });
   const [eventFormData, setEventFormData] = useState({ name: '', startDate: '', endDate: '', isActive: true });
+  const [stockFormData, setStockFormData] = useState({ name: '', currentStock: 0, minThreshold: 10 });
+
+  // Load stock when tab is active
+  React.useEffect(() => {
+    if (activeTab === 'stock') {
+      setLoadingStock(true);
+      api.fetchMerchandise().then(setMerchandiseList).finally(() => setLoadingStock(false));
+    }
+  }, [activeTab]);
 
   const maskChannel = (val: string) => {
       let clean = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -78,11 +92,12 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     setChannelFormData({ name: '', frequency: '', type: 'VHF' });
     setUserFormData({ name: '', preferredName: '', email: '', phone: '', role: 'USER', password: '', isActive: true });
     setEventFormData({ name: '', startDate: '', endDate: '', isActive: true });
+    setStockFormData({ name: '', currentStock: 0, minThreshold: 10 });
     setIsAdding(false);
     setEditingId(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (activeTab === 'inventory' && inventorySubTab === 'itens') {
         if (editingId) onUpdateItem(editingId, itemFormData.name);
@@ -107,6 +122,11 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     } else if (activeTab === 'events') {
         if (editingId) onUpdateEvent({ id: editingId, ...eventFormData });
         else onAddEvent(eventFormData);
+    } else if (activeTab === 'stock') {
+        if (editingId) await api.updateMerchandise({ id: editingId, ...stockFormData });
+        else await api.createMerchandise(stockFormData);
+        // Reload list
+        api.fetchMerchandise().then(setMerchandiseList);
     }
     resetForms();
   };
@@ -121,6 +141,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
         if (inventorySubTab === 'ativos') return equipmentList.filter(eq => eq.inventoryNumber.toLowerCase().includes(term));
         return itemList.filter(c => c.name.toLowerCase().includes(term));
     }
+    if (activeTab === 'stock') return merchandiseList.filter(m => m.name.toLowerCase().includes(term));
     return [];
   };
 
@@ -165,7 +186,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
             { id: 'inventory', label: 'Inventário', icon: Package },
             { id: 'channels', label: 'Canais', icon: RadioIcon },
             { id: 'sectors', label: 'Setores', icon: Users },
-            { id: 'users', label: 'Usuários', icon: Shield }
+            { id: 'users', label: 'Usuários', icon: Shield },
+            { id: 'stock', label: 'Estoque', icon: Tag }
         ].map(tab => (
             <button 
               key={tab.id} 
@@ -201,10 +223,29 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-2xl animate-in slide-in-from-top-4 duration-300">
             <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-100 pb-3 uppercase tracking-tighter">
                 <Plus size={20} className="text-brand-500" /> 
-                {editingId ? 'Editar' : 'Novo'} {activeTab === 'inventory' ? (inventorySubTab === 'ativos' ? 'Ativo' : 'ITEM') : activeTab.slice(0, -1).toUpperCase()}
+                {editingId ? 'Editar' : 'Novo'} {activeTab === 'inventory' ? (inventorySubTab === 'ativos' ? 'Ativo' : 'ITEM') : (activeTab === 'stock' ? 'Item de Estoque' : activeTab.slice(0, -1).toUpperCase())}
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-6">
+                
+                {/* FORMULÁRIO DE ESTOQUE (PINS & PATCHES) */}
+                {activeTab === 'stock' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="md:col-span-2 space-y-1">
+                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do Item</label>
+                            <input required type="text" placeholder="Ex: Pin Global, Patch ADM..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" value={stockFormData.name} onChange={e => setStockFormData({...stockFormData, name: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs uppercase text-brand-600 font-bold">Saldo Inicial</label>
+                            <input required type="number" min="0" className="w-full bg-gray-50 border border-brand-200 rounded-lg p-3 font-mono font-bold text-brand-600" value={stockFormData.currentStock} onChange={e => setStockFormData({...stockFormData, currentStock: parseInt(e.target.value) || 0})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs uppercase text-gray-400 font-bold">Estoque Mínimo (Alerta)</label>
+                            <input required type="number" min="0" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={stockFormData.minThreshold} onChange={e => setStockFormData({...stockFormData, minThreshold: parseInt(e.target.value) || 0})} />
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === 'channels' && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1">
@@ -369,9 +410,24 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
              <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black">
-                        <th className="p-4 md:p-6">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Categoria' : (activeTab === 'sectors' ? 'Sigla' : (activeTab === 'channels' ? 'Canal' : 'Identificação'))}</th>
-                        <th className="p-4 md:p-6 hidden md:table-cell">{activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado em' : (activeTab === 'sectors' ? 'Coordenador' : (activeTab === 'channels' ? 'Frequência' : 'Status/Info'))}</th>
-                        <th className="p-4 md:p-6">{activeTab === 'sectors' ? 'Canal' : (activeTab === 'users' ? 'Status de Acesso' : (activeTab === 'channels' ? 'Sinal' : ''))}</th>
+                        <th className="p-4 md:p-6">
+                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Categoria' : 
+                             activeTab === 'sectors' ? 'Sigla' : 
+                             activeTab === 'channels' ? 'Canal' : 
+                             activeTab === 'stock' ? 'Item de Estoque' : 'Identificação'}
+                        </th>
+                        <th className="p-4 md:p-6 hidden md:table-cell">
+                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado em' : 
+                             activeTab === 'sectors' ? 'Coordenador' : 
+                             activeTab === 'channels' ? 'Frequência' : 
+                             activeTab === 'stock' ? 'Alerta Mínimo' : 'Status/Info'}
+                        </th>
+                        <th className="p-4 md:p-6">
+                            {activeTab === 'sectors' ? 'Canal' : 
+                             activeTab === 'users' ? 'Status de Acesso' : 
+                             activeTab === 'channels' ? 'Sinal' : 
+                             activeTab === 'stock' ? 'Saldo Atual' : ''}
+                        </th>
                         <th className="p-4 md:p-6 text-right">Ações</th>
                     </tr>
                 </thead>
@@ -412,6 +468,9 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                                     <div className="text-[10px] text-gray-400 font-mono md:hidden">{item.email}</div>
                                                 </>
                                             )}
+                                            {activeTab === 'stock' && (
+                                                <div className="font-bold text-gray-900">{item.name}</div>
+                                            )}
                                         </div>
                                     </td>
 
@@ -430,6 +489,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                         )}
                                         {activeTab === 'channels' && <div className="text-xs font-bold text-brand-600">{item.frequency} MHz</div>}
                                         {activeTab === 'users' && <div className="text-xs font-black text-brand-600 uppercase">{item.role}</div>}
+                                        {activeTab === 'stock' && <div className="text-xs text-gray-500">Mín: <span className="font-bold">{item.minThreshold}</span></div>}
                                     </td>
 
                                     {/* COLUNA 3: STATUS / VÍNCULOS (MOBILE & DESKTOP) */}
@@ -464,6 +524,11 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                                 </div>
                                             ) : <span className="text-[10px] text-gray-300 italic">S/ Vínculo</span>
                                         )}
+                                        {activeTab === 'stock' && (
+                                            <div className={`font-mono font-bold text-lg ${item.currentStock <= item.minThreshold ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                {item.currentStock}
+                                            </div>
+                                        )}
                                     </td>
 
                                     {/* COLUNA 4: AÇÕES */}
@@ -476,13 +541,14 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                                 if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || '', channelId: item.channelId || ''});
                                                 if (activeTab === 'channels') setChannelFormData({name: item.name, frequency: item.frequency, type: item.type});
                                                 if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: '', isActive: item.isActive});
+                                                if (activeTab === 'stock') setStockFormData({ name: item.name, currentStock: item.currentStock, minThreshold: item.minThreshold });
                                                 setEditingId(item.id);
                                                 setIsAdding(true);
                                             }}
                                             className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all"
                                         ><Pencil size={16}/></button>
                                         <button 
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 if (confirm('Deseja excluir permanentemente?')) {
                                                     if (activeTab === 'events') onDeleteEvent(item.id);
                                                     if (activeTab === 'inventory') {
@@ -492,6 +558,10 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                                     if (activeTab === 'sectors') onDeleteSector(item.id);
                                                     if (activeTab === 'channels') onDeleteChannel(item.id);
                                                     if (activeTab === 'users') onDeleteUser(item.id);
+                                                    if (activeTab === 'stock') {
+                                                        await api.deleteMerchandise(item.id);
+                                                        api.fetchMerchandise().then(setMerchandiseList);
+                                                    }
                                                 }
                                             }}
                                             className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"

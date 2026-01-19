@@ -81,7 +81,7 @@ export interface DashboardStats {
   utilizationRate: number;
 }
 
-export type ViewState = 'dashboard' | 'rentals' | 'new-rental' | 'history' | 'settings' | 'reports' | 'profile';
+export type ViewState = 'dashboard' | 'rentals' | 'new-rental' | 'history' | 'settings' | 'reports' | 'profile' | 'pins-patches';
 
 export type UserRole = 'ADMIN' | 'USER';
 
@@ -94,4 +94,33 @@ export interface User {
   role: UserRole;
   avatarInitials: string;
   isActive: boolean;
+}
+
+// --- NOVOS TIPOS PARA PINS E PATCHES ---
+
+export interface MerchandiseItem {
+  id: string;
+  name: string;
+  currentStock: number;
+  minThreshold: number;
+}
+
+export interface Legendario {
+  id: string;
+  cpf: string;
+  name: string;
+  email: string;
+  phone: string;
+  registrationNumber?: string;
+  deliveries?: Record<string, string>; // Map of MerchandiseID -> ISODateString
+}
+
+export interface ImportPreviewData {
+  cpf: string;
+  name: string;
+  email: string;
+  phone: string;
+  registrationNumber: string;
+  exists: boolean;
+  selected: boolean;
 }
