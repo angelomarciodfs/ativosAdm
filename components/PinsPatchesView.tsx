@@ -38,7 +38,11 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
   useEffect(() => {
     if (searchTerm.length > 2) {
       const delayDebounceFn = setTimeout(() => {
-        api.searchLegendarios(searchTerm).then(setLegendarios);
+        api.searchLegendarios(searchTerm).then(data => {
+            // Ordenar alfabeticamente o resultado da busca
+            const sortedData = data.sort((a: Legendario, b: Legendario) => a.name.localeCompare(b.name));
+            setLegendarios(sortedData);
+        });
       }, 500);
       return () => clearTimeout(delayDebounceFn);
     } else if (searchTerm.length === 0) {
@@ -51,6 +55,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
     if (!file) return;
 
     const candidates: ImportPreviewData[] = [];
+    const seenCPFs = new Set<string>(); // Set para evitar duplicatas dentro do próprio arquivo
 
     try {
         if (file.name.endsWith('.xlsx')) {
@@ -76,6 +81,10 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
 
                 // Validamos se existe pelo menos Nome e CPF para importar
                 if (cpfRaw && name) {
+                    // Se já processamos este CPF neste arquivo, ignoramos a duplicata
+                    if (seenCPFs.has(cpfRaw)) continue;
+                    
+                    seenCPFs.add(cpfRaw);
                     candidates.push({
                         cpf: cpfRaw,
                         name: name,
@@ -103,6 +112,9 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                const phone = cols[3] || '';
                
                if (cpfRaw && name) {
+                   if (seenCPFs.has(cpfRaw)) continue;
+
+                   seenCPFs.add(cpfRaw);
                    candidates.push({
                        cpf: cpfRaw,
                        name,
@@ -121,7 +133,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
             return;
         }
 
-        // Check DB for duplicates
+        // Check DB for duplicates (Banco de Dados)
         const cpfsToCheck = candidates.map(c => c.cpf);
         const existingCPFs = await api.checkExistingCPFs(cpfsToCheck);
         
@@ -129,7 +141,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
             ...c,
             exists: existingCPFs.includes(c.cpf),
             selected: !existingCPFs.includes(c.cpf) // Auto-deselect existing
-        }));
+        })).sort((a, b) => a.name.localeCompare(b.name)); // Ordenar alfabeticamente no Modal
 
         setImportPreview(processedCandidates);
         setIsImportModalOpen(true);
