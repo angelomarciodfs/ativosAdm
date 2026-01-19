@@ -141,6 +141,19 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
     }
   };
 
+  // Lógica de Seleção em Massa
+  const validImportItems = importPreview.filter(i => !i.exists);
+  const isAllSelected = validImportItems.length > 0 && validImportItems.every(i => i.selected);
+
+  const toggleSelectAll = () => {
+    const newState = !isAllSelected;
+    setImportPreview(prev => prev.map(item => {
+        // Não altera itens que já existem no banco (duplicados)
+        if (item.exists) return item;
+        return { ...item, selected: newState };
+    }));
+  };
+
   const confirmImport = async () => {
       setIsImporting(true);
       try {
@@ -183,14 +196,14 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0 h-full flex flex-col">
+    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0 h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0">
         <div>
           <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Pins & Patches</h2>
           <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Gestão de entregas e estoque de materiais.</p>
         </div>
-        <div className="flex gap-2">
-            <label className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 shadow-lg shadow-brand-500/20 cursor-pointer transition-all">
+        <div className="flex gap-2 w-full md:w-auto">
+            <label className="flex items-center justify-center w-full md:w-auto gap-2 px-6 py-3 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 shadow-lg shadow-brand-500/20 cursor-pointer transition-all active:scale-95">
                 <Upload size={18} /> Importar (CSV / XLSX)
                 <input type="file" accept=".csv, .xlsx" className="hidden" onChange={handleFileUpload} />
             </label>
@@ -198,7 +211,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
       </div>
 
       {/* SEARCH & STOCK SUMMARY */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 shrink-0">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 shrink-0">
           <div className="lg:col-span-2 relative">
              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
              <input 
@@ -209,44 +222,50 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                 onChange={e => setSearchTerm(e.target.value)}
              />
           </div>
-          <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4 overflow-x-auto no-scrollbar">
-              {merchandise.map(item => (
-                  <div key={item.id} className="min-w-[100px] flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 border border-gray-100">
-                      <span className="text-[10px] uppercase font-bold text-gray-400 text-center leading-tight h-6 overflow-hidden">{item.name}</span>
-                      <span className={`text-xl font-black ${item.currentStock < item.minThreshold ? 'text-red-500' : 'text-gray-800'}`}>
-                          {item.currentStock}
-                      </span>
-                  </div>
-              ))}
+          {/* Stock List - Improved scrolling and spacing */}
+          <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 overflow-x-auto custom-scrollbar min-h-[90px]">
+              {merchandise.length === 0 ? (
+                  <div className="text-xs text-gray-400 w-full text-center">Nenhum item de estoque.</div>
+              ) : (
+                  merchandise.map(item => (
+                      <div key={item.id} className="min-w-[90px] flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 border border-gray-100 shrink-0">
+                          <span className="text-[10px] uppercase font-bold text-gray-400 text-center leading-tight h-6 overflow-hidden flex items-center">{item.name}</span>
+                          <span className={`text-xl font-black ${item.currentStock < item.minThreshold ? 'text-red-500' : 'text-gray-800'}`}>
+                              {item.currentStock}
+                          </span>
+                      </div>
+                  ))
+              )}
           </div>
       </div>
 
       {/* RESULTS LIST */}
-      <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-         <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+      <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+         <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Resultados da Busca</span>
              <span className="text-xs font-bold text-gray-400">{legendarios.length} encontrados</span>
          </div>
-         <div className="flex-1 overflow-y-auto">
+         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
              {legendarios.length === 0 ? (
-                 <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50">
+                 <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50 min-h-[200px]">
                      <Search size={48} className="mb-4" />
-                     <p className="font-medium">Busque por um legendário para gerenciar entregas.</p>
+                     <p className="font-medium text-center px-4">Busque por um legendário para gerenciar entregas.</p>
                  </div>
              ) : (
-                 <div className="divide-y divide-gray-100">
+                 <div className="space-y-2">
                      {legendarios.map(leg => (
-                         <div key={leg.id} className="p-4 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4 hover:bg-gray-50 transition-colors">
-                             <div className="flex-1 min-w-0 text-center md:text-left">
-                                 <h4 className="text-lg font-bold text-gray-900">{leg.name}</h4>
+                         <div key={leg.id} className="p-4 rounded-xl border border-gray-100 bg-white shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 hover:border-brand-200 hover:shadow-md transition-all">
+                             <div className="flex-1 min-w-0 text-center md:text-left w-full md:w-auto">
+                                 <h4 className="text-lg font-bold text-gray-900 truncate">{leg.name}</h4>
                                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 text-sm text-gray-500 mt-1">
-                                     <span className="font-mono bg-gray-100 px-1.5 rounded text-xs">{leg.cpf}</span>
-                                     <span>{leg.email}</span>
+                                     <span className="font-mono bg-gray-100 px-1.5 rounded text-xs text-gray-600 font-bold">{leg.cpf}</span>
+                                     <span className="truncate max-w-[200px]">{leg.email}</span>
                                      {leg.registrationNumber && <span className="text-brand-600 font-bold">#{leg.registrationNumber}</span>}
                                  </div>
                              </div>
                              
-                             <div className="flex items-center gap-2 md:gap-4 flex-wrap justify-center">
+                             {/* Botões de Entrega Responsivos */}
+                             <div className="flex items-center gap-2 flex-wrap justify-center w-full md:w-auto">
                                  {merchandise.map(item => {
                                      const isDelivered = !!leg.deliveries?.[item.id];
                                      const deliveryDate = isDelivered ? new Date(leg.deliveries![item.id]).toLocaleString('pt-BR') : '';
@@ -258,21 +277,22 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                             disabled={isDelivered || item.currentStock <= 0}
                                             title={isDelivered ? `Entregue em: ${deliveryDate}` : (item.currentStock <= 0 ? 'Sem Estoque' : 'Entregar Item')}
                                             className={`
-                                                relative group flex flex-col items-center justify-center w-20 h-20 rounded-xl border-2 transition-all duration-200
+                                                relative group flex flex-col items-center justify-center rounded-xl border-2 transition-all duration-200
+                                                w-16 h-16 md:w-20 md:h-20
                                                 ${isDelivered 
                                                     ? 'bg-emerald-50 border-emerald-500 text-emerald-600' 
                                                     : (item.currentStock <= 0 
                                                         ? 'bg-gray-100 border-gray-200 text-gray-300 cursor-not-allowed'
-                                                        : 'bg-white border-gray-200 text-gray-400 hover:border-brand-500 hover:text-brand-500 hover:shadow-lg')
+                                                        : 'bg-white border-gray-200 text-gray-400 hover:border-brand-500 hover:text-brand-500 hover:shadow-lg hover:scale-105 active:scale-95')
                                                 }
                                             `}
                                          >
-                                             {isDelivered ? <CheckCircle size={24} className="mb-1" /> : <Circle size={24} className="mb-1" />}
-                                             <span className="text-[9px] font-bold text-center leading-tight px-1">{item.name}</span>
+                                             {isDelivered ? <CheckCircle size={20} className="mb-1 md:w-6 md:h-6" /> : <Circle size={20} className="mb-1 md:w-6 md:h-6" />}
+                                             <span className="text-[9px] md:text-[10px] font-bold text-center leading-tight px-1 line-clamp-2">{item.name}</span>
                                              
                                              {/* Tooltip for Date */}
                                              {isDelivered && (
-                                                 <div className="absolute bottom-full mb-2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                                 <div className="absolute bottom-full mb-2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10 shadow-xl">
                                                      {deliveryDate}
                                                  </div>
                                              )}
@@ -290,8 +310,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
       {/* IMPORT MODAL */}
       {isImportModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col animate-in zoom-in-95">
-                  <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col animate-in zoom-in-95">
+                  <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
                       <div>
                           <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
                              <FileSpreadsheet className="text-brand-500" />
@@ -304,9 +324,17 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                   
                   <div className="flex-1 overflow-auto p-0">
                       <table className="w-full text-left border-collapse">
-                          <thead className="bg-gray-50 sticky top-0 z-10">
+                          <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                               <tr className="text-xs uppercase font-bold text-gray-500">
-                                  <th className="p-4 w-10"><input type="checkbox" disabled /></th>
+                                  <th className="p-4 w-10 text-center">
+                                      <input 
+                                        type="checkbox" 
+                                        checked={isAllSelected}
+                                        onChange={toggleSelectAll}
+                                        disabled={validImportItems.length === 0}
+                                        className="w-4 h-4 rounded text-brand-500 focus:ring-brand-500 cursor-pointer disabled:opacity-50"
+                                      />
+                                  </th>
                                   <th className="p-4">Nome</th>
                                   <th className="p-4">CPF</th>
                                   <th className="p-4">Email</th>
@@ -315,8 +343,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                           </thead>
                           <tbody className="divide-y divide-gray-100 text-sm">
                               {importPreview.map((item, idx) => (
-                                  <tr key={idx} className={item.exists ? 'bg-gray-50 opacity-60' : 'hover:bg-brand-50/10'}>
-                                      <td className="p-4">
+                                  <tr key={idx} className={item.exists ? 'bg-gray-50 opacity-60' : 'hover:bg-brand-50/10 transition-colors'}>
+                                      <td className="p-4 text-center">
                                           <input 
                                             type="checkbox" 
                                             checked={item.selected} 
@@ -326,7 +354,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                                 setImportPreview(updated);
                                             }}
                                             disabled={item.exists}
-                                            className="rounded text-brand-500 focus:ring-brand-500"
+                                            className="w-4 h-4 rounded text-brand-500 focus:ring-brand-500 cursor-pointer disabled:opacity-50"
                                           />
                                       </td>
                                       <td className="p-4 font-bold text-gray-900">{item.name}</td>
@@ -334,11 +362,11 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                       <td className="p-4 text-gray-500 truncate max-w-[200px]">{item.email}</td>
                                       <td className="p-4 text-center">
                                           {item.exists ? (
-                                              <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
+                                              <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full border border-orange-100">
                                                   <AlertTriangle size={12} /> Duplicado
                                               </span>
                                           ) : (
-                                              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                                              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">
                                                   <Check size={12} /> Novo
                                               </span>
                                           )}
@@ -349,7 +377,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                       </table>
                   </div>
 
-                  <div className="p-6 border-t border-gray-100 flex justify-between items-center bg-gray-50 rounded-b-2xl">
+                  <div className="p-6 border-t border-gray-100 flex justify-between items-center bg-gray-50 rounded-b-2xl shrink-0">
                       <div className="text-sm font-bold text-gray-600">
                           {importPreview.filter(i => i.selected).length} selecionados para importar
                       </div>
@@ -358,7 +386,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                           <button 
                             onClick={confirmImport} 
                             disabled={isImporting || importPreview.filter(i => i.selected).length === 0}
-                            className="px-6 py-3 rounded-xl bg-brand-500 text-white font-bold hover:bg-brand-600 shadow-lg shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-6 py-3 rounded-xl bg-brand-500 text-white font-bold hover:bg-brand-600 shadow-lg shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-95 transition-transform"
                           >
                              {isImporting && <Loader className="animate-spin" size={18} />}
                              Confirmar Importação
