@@ -2,7 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { MerchandiseItem, Legendario, ImportPreviewData, User } from '../types';
 import { api } from '../services/database';
-import { Search, Upload, CheckCircle, Circle, AlertTriangle, X, Check, Loader } from 'lucide-react';
+import { Search, Upload, CheckCircle, Circle, AlertTriangle, X, Check, Loader, FileSpreadsheet } from 'lucide-react';
+// @ts-ignore
+import readXlsxFile from 'read-excel-file';
 
 interface PinsPatchesViewProps {
   currentUser: User | null;
@@ -28,8 +30,6 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
       setLoading(true);
       const items = await api.fetchMerchandise();
       setMerchandise(items);
-      // Load initial legendarios or wait for search? Let's load empty or recent.
-      // For now, let's just fetch items. Legendarios will be searched.
     } finally {
       setLoading(false);
     }
@@ -50,59 +50,87 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const text = await file.text();
-    // Assuming CSV format: Nome,CPF,Email,Telefone,Numero (Headers optional, logic mostly positional or basic parsing)
-    // Simple CSV parser for "Ticket and Go" export simulation
-    const lines = text.split('\n').filter(line => line.trim() !== '');
-    
-    // Header detection logic can be added here. For now, assuming format based on prompt description or simple detection.
-    // Let's assume a standard CSV with headers.
-    
-    // Extract CPFs to check duplicates
     const candidates: ImportPreviewData[] = [];
-    
-    for (let i = 1; i < lines.length; i++) { // Skip header
-       const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
-       if (cols.length < 3) continue; // Invalid row
-       
-       // Mapping based on "CPF, NOME, EMAIL, TELEFONE" or similar standard
-       // Try to find CPF column index dynamically or hardcode if format is strict.
-       // Assuming: Name (0), Email (1), Phone (2), CPF (3) - Common order, but let's try to be generic.
-       // Actually, the prompt says "CPF, NOME, EMAIL, TELEFONE".
-       // Let's assume order: CPF, Name, Email, Phone
-       
-       // Clean CPF
-       const cpfRaw = cols[0] || '';
-       const name = cols[1] || '';
-       const email = cols[2] || '';
-       const phone = cols[3] || '';
-       
-       if (cpfRaw && name) {
-           candidates.push({
-               cpf: cpfRaw,
-               name,
-               email,
-               phone,
-               registrationNumber: '', // Not in import description, maybe generate or leave blank
-               exists: false,
-               selected: true
-           });
-       }
+
+    try {
+        if (file.name.endsWith('.xlsx')) {
+            // Lógica para Excel (.xlsx)
+            const rows = await readXlsxFile(file);
+            // Assumindo que a linha 0 é o cabeçalho, começamos do 1
+            // Ordem esperada: CPF, NOME, EMAIL, TELEFONE
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length === 0) continue;
+
+                const cpfRaw = row[0] ? String(row[0]).trim() : '';
+                const name = row[1] ? String(row[1]).trim() : '';
+                const email = row[2] ? String(row[2]).trim() : '';
+                const phone = row[3] ? String(row[3]).trim() : '';
+
+                if (cpfRaw && name) {
+                    candidates.push({
+                        cpf: cpfRaw,
+                        name: name,
+                        email: email,
+                        phone: phone,
+                        registrationNumber: '',
+                        exists: false,
+                        selected: true
+                    });
+                }
+            }
+        } else {
+            // Lógica para CSV
+            const text = await file.text();
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            
+            for (let i = 1; i < lines.length; i++) { // Skip header
+               const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
+               if (cols.length < 2) continue; // Mínimo CPF e Nome
+               
+               // Ordem esperada: CPF, NOME, EMAIL, TELEFONE
+               const cpfRaw = cols[0] || '';
+               const name = cols[1] || '';
+               const email = cols[2] || '';
+               const phone = cols[3] || '';
+               
+               if (cpfRaw && name) {
+                   candidates.push({
+                       cpf: cpfRaw,
+                       name,
+                       email,
+                       phone,
+                       registrationNumber: '',
+                       exists: false,
+                       selected: true
+                   });
+               }
+            }
+        }
+
+        if (candidates.length === 0) {
+            alert("Nenhum dado válido encontrado no arquivo.");
+            return;
+        }
+
+        // Check DB for duplicates
+        const cpfsToCheck = candidates.map(c => c.cpf);
+        const existingCPFs = await api.checkExistingCPFs(cpfsToCheck);
+        
+        const processedCandidates = candidates.map(c => ({
+            ...c,
+            exists: existingCPFs.includes(c.cpf),
+            selected: !existingCPFs.includes(c.cpf) // Auto-deselect existing
+        }));
+
+        setImportPreview(processedCandidates);
+        setIsImportModalOpen(true);
+        e.target.value = ''; // Reset input
+
+    } catch (error) {
+        console.error("Erro ao processar arquivo:", error);
+        alert("Erro ao ler o arquivo. Verifique se o formato está correto (CPF, Nome, Email, Telefone).");
     }
-
-    // Check DB for duplicates
-    const cpfsToCheck = candidates.map(c => c.cpf);
-    const existingCPFs = await api.checkExistingCPFs(cpfsToCheck);
-    
-    const processedCandidates = candidates.map(c => ({
-        ...c,
-        exists: existingCPFs.includes(c.cpf),
-        selected: !existingCPFs.includes(c.cpf) // Auto-deselect existing
-    }));
-
-    setImportPreview(processedCandidates);
-    setIsImportModalOpen(true);
-    e.target.value = ''; // Reset input
   };
 
   const confirmImport = async () => {
@@ -155,8 +183,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
         </div>
         <div className="flex gap-2">
             <label className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 shadow-lg shadow-brand-500/20 cursor-pointer transition-all">
-                <Upload size={18} /> Importar (CSV)
-                <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+                <Upload size={18} /> Importar (CSV / XLSX)
+                <input type="file" accept=".csv, .xlsx" className="hidden" onChange={handleFileUpload} />
             </label>
         </div>
       </div>
@@ -257,7 +285,10 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col animate-in zoom-in-95">
                   <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                       <div>
-                          <h3 className="text-xl font-black text-gray-900">Importação de Legendários</h3>
+                          <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                             <FileSpreadsheet className="text-brand-500" />
+                             Importação de Legendários
+                          </h3>
                           <p className="text-sm text-gray-500">Confira os dados antes de confirmar.</p>
                       </div>
                       <button onClick={() => setIsImportModalOpen(false)} className="text-gray-400 hover:text-gray-700"><X size={24} /></button>
@@ -292,7 +323,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                       </td>
                                       <td className="p-4 font-bold text-gray-900">{item.name}</td>
                                       <td className="p-4 font-mono text-gray-600">{item.cpf}</td>
-                                      <td className="p-4 text-gray-500">{item.email}</td>
+                                      <td className="p-4 text-gray-500 truncate max-w-[200px]">{item.email}</td>
                                       <td className="p-4 text-center">
                                           {item.exists ? (
                                               <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
