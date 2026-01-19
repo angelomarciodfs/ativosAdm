@@ -56,17 +56,25 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
         if (file.name.endsWith('.xlsx')) {
             // Lógica para Excel (.xlsx)
             const rows = await readXlsxFile(file);
+            
+            // Mapeamento específico solicitado:
+            // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9
+            const IDX_CPF = 5;      // Coluna F
+            const IDX_NAME = 7;     // Coluna H
+            const IDX_EMAIL = 8;    // Coluna I
+            const IDX_PHONE = 9;    // Coluna J
+
             // Assumindo que a linha 0 é o cabeçalho, começamos do 1
-            // Ordem esperada: CPF, NOME, EMAIL, TELEFONE
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
                 if (!row || row.length === 0) continue;
 
-                const cpfRaw = row[0] ? String(row[0]).trim() : '';
-                const name = row[1] ? String(row[1]).trim() : '';
-                const email = row[2] ? String(row[2]).trim() : '';
-                const phone = row[3] ? String(row[3]).trim() : '';
+                const cpfRaw = row[IDX_CPF] ? String(row[IDX_CPF]).trim() : '';
+                const name = row[IDX_NAME] ? String(row[IDX_NAME]).trim() : '';
+                const email = row[IDX_EMAIL] ? String(row[IDX_EMAIL]).trim() : '';
+                const phone = row[IDX_PHONE] ? String(row[IDX_PHONE]).trim() : '';
 
+                // Validamos se existe pelo menos Nome e CPF para importar
                 if (cpfRaw && name) {
                     candidates.push({
                         cpf: cpfRaw,
@@ -80,15 +88,15 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                 }
             }
         } else {
-            // Lógica para CSV
+            // Lógica para CSV (Mantida padrão ou ajustável se necessário)
             const text = await file.text();
             const lines = text.split('\n').filter(line => line.trim() !== '');
             
             for (let i = 1; i < lines.length; i++) { // Skip header
                const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
-               if (cols.length < 2) continue; // Mínimo CPF e Nome
+               if (cols.length < 2) continue; 
                
-               // Ordem esperada: CPF, NOME, EMAIL, TELEFONE
+               // Ordem esperada no CSV simples: CPF, NOME, EMAIL, TELEFONE
                const cpfRaw = cols[0] || '';
                const name = cols[1] || '';
                const email = cols[2] || '';
@@ -129,7 +137,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
 
     } catch (error) {
         console.error("Erro ao processar arquivo:", error);
-        alert("Erro ao ler o arquivo. Verifique se o formato está correto (CPF, Nome, Email, Telefone).");
+        alert("Erro ao ler o arquivo. Verifique se o formato está correto.");
     }
   };
 
