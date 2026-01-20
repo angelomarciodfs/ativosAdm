@@ -26,6 +26,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<Legendario>>({});
+  const [editDeliveryDates, setEditDeliveryDates] = useState<Record<string, string>>({});
 
   // Função centralizada para buscar legendários
   const fetchLegendarios = useCallback(async (term: string) => {
@@ -251,6 +252,17 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
         phone: legendario.phone,
         registrationNumber: legendario.registrationNumber
     });
+    // Populando as datas de entrega existentes para edição
+    const dates: Record<string, string> = {};
+    if (legendario.deliveries) {
+        Object.entries(legendario.deliveries).forEach(([itemId, dateIso]) => {
+            // Converter ISO para formato datetime-local (yyyy-MM-ddThh:mm)
+            if (dateIso) {
+                dates[itemId] = new Date(dateIso).toISOString().slice(0, 16);
+            }
+        });
+    }
+    setEditDeliveryDates(dates);
     setSelectedLegendario(legendario);
     setIsEditModalOpen(true);
   };
@@ -265,10 +277,22 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
     if (!selectedLegendario) return;
 
     try {
+        // 1. Atualizar dados do perfil
         await api.updateLegendario({ id: selectedLegendario.id, ...editFormData });
         
-        // Atualiza estado local
-        setLegendarios(prev => prev.map(l => l.id === selectedLegendario.id ? { ...l, ...editFormData } : l));
+        // 2. Atualizar datas de entrega modificadas
+        const promises = Object.entries(editDeliveryDates).map(async ([itemId, newDate]) => {
+            const originalDate = selectedLegendario.deliveries?.[itemId];
+            // Se a data mudou, atualiza no banco
+            if (originalDate && new Date(originalDate).toISOString().slice(0, 16) !== newDate) {
+                 await api.updateDeliveryDate(selectedLegendario.id, itemId, new Date(newDate).toISOString());
+            }
+        });
+
+        await Promise.all(promises);
+
+        // 3. Atualiza estado local (Recarregando para garantir integridade)
+        await fetchLegendarios(searchTerm);
         
         setIsEditModalOpen(false);
         setSelectedLegendario(null);
@@ -288,40 +312,81 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
             await api.undoDelivery(legendario.id, item.id);
             
             // Atualização Otimista: Remove a entrega e devolve estoque
-            setLegendarios(prev => prev.map(l => {
-                if (l.id === legendario.id) {
-                    const newDeliveries = { ...l.deliveries };
-                    delete newDeliveries[item.id];
-                    return { ...l, deliveries: newDeliveries };
-                }
-                return l;
-            }));
-            
-            setMerchandise(prev => prev.map(m => {
-                if (m.id === item.id) return { ...m, currentStock: m.currentStock + 1 };
-                return m;
-            }));
+            const updateState = (prevLegs: Legendario[], prevMerch: MerchandiseItem[]) => {
+                const newLegs = prevLegs.map(l => {
+                    if (l.id === legendario.id) {
+                        const newDeliveries = { ...l.deliveries };
+                        delete newDeliveries[item.id];
+                        return { ...l, deliveries: newDeliveries };
+                    }
+                    return l;
+                });
+                const newMerch = prevMerch.map(m => {
+                    if (m.id === item.id) return { ...m, currentStock: m.currentStock + 1 };
+                    return m;
+                });
+                return { newLegs, newMerch };
+            };
+
+            // Atualiza Lista Principal
+            setLegendarios(prev => {
+                const { newLegs } = updateState(prev, merchandise);
+                return newLegs;
+            });
+            setMerchandise(prev => {
+                const { newMerch } = updateState(legendarios, prev);
+                return newMerch;
+            });
+
+            // Atualiza Modal Selecionado se estiver aberto
+            if (selectedLegendario && selectedLegendario.id === legendario.id) {
+                 setSelectedLegendario(prev => {
+                     if (!prev) return null;
+                     const newDeliveries = { ...prev.deliveries };
+                     delete newDeliveries[item.id];
+                     return { ...prev, deliveries: newDeliveries };
+                 });
+            }
 
         } else {
             // Lógica de Entrega
             await api.deliverItem(legendario.id, item.id, currentUser.id);
             
-            // Atualização Otimista: Adiciona entrega e baixa estoque
             const now = new Date().toISOString();
-            setLegendarios(prev => prev.map(l => {
-                if (l.id === legendario.id) {
-                    return {
-                        ...l,
-                        deliveries: { ...l.deliveries, [item.id]: now }
-                    };
-                }
-                return l;
-            }));
+            
+            // Atualização Otimista
+            const updateState = (prevLegs: Legendario[], prevMerch: MerchandiseItem[]) => {
+                 const newLegs = prevLegs.map(l => {
+                    if (l.id === legendario.id) {
+                        return {
+                            ...l,
+                            deliveries: { ...l.deliveries, [item.id]: now }
+                        };
+                    }
+                    return l;
+                 });
+                 const newMerch = prevMerch.map(m => {
+                    if (m.id === item.id) return { ...m, currentStock: m.currentStock - 1 };
+                    return m;
+                 });
+                 return { newLegs, newMerch };
+            };
 
-            setMerchandise(prev => prev.map(m => {
-                if (m.id === item.id) return { ...m, currentStock: m.currentStock - 1 };
-                return m;
-            }));
+            setLegendarios(prev => {
+                const { newLegs } = updateState(prev, merchandise);
+                return newLegs;
+            });
+            setMerchandise(prev => {
+                 const { newMerch } = updateState(legendarios, prev);
+                 return newMerch;
+            });
+
+            if (selectedLegendario && selectedLegendario.id === legendario.id) {
+                 setSelectedLegendario(prev => {
+                     if (!prev) return null;
+                     return { ...prev, deliveries: { ...prev.deliveries, [item.id]: now } };
+                 });
+            }
         }
     } catch (error: any) {
         alert(error.message || "Erro ao processar a ação.");
@@ -349,20 +414,20 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
         </div>
       </div>
 
-      {/* SEARCH & STOCK SUMMARY */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 shrink-0">
+      {/* SEARCH & STOCK SUMMARY - Ajuste de Grid para 5 colunas (2 busca, 3 estoque) */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:gap-6 shrink-0">
           <div className="lg:col-span-2 relative">
              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
              <input 
                 type="text" 
-                placeholder="Pesquisar por Nome, CPF ou Nº Legendário..." 
+                placeholder="Pesquisar..." 
                 className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl shadow-sm text-lg focus:ring-2 focus:ring-brand-500 focus:outline-none"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
              />
           </div>
           {/* Stock List */}
-          <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 overflow-x-auto custom-scrollbar min-h-[90px]">
+          <div className="lg:col-span-3 bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 overflow-x-auto custom-scrollbar min-h-[90px]">
               {merchandise.length === 0 ? (
                   <div className="text-xs text-gray-400 w-full text-center">Nenhum item de estoque.</div>
               ) : (
@@ -471,58 +536,85 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
       {/* EDIT MODAL */}
       {isEditModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95">
-                 <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+                 <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
                      <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
                         <Pencil className="text-brand-500" size={20} /> Editar Legendário
                      </h3>
                      <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-700"><X size={24} /></button>
                  </div>
-                 <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
-                     <div>
-                         <label className="text-xs uppercase font-bold text-gray-500">Nome Completo</label>
-                         <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" 
-                            value={editFormData.name || ''} 
-                            onChange={e => setEditFormData({...editFormData, name: e.target.value})} 
-                            required 
-                         />
-                     </div>
-                     <div>
-                        <label className="text-xs uppercase font-bold text-brand-600">Nº LGND (Inscrição)</label>
-                        <div className="relative">
-                            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-300" size={18} />
-                            <input type="text" className="w-full bg-brand-50 border border-brand-200 rounded-lg p-3 pl-10 font-mono font-bold text-brand-800" 
-                                value={editFormData.registrationNumber || ''} 
-                                onChange={e => setEditFormData({...editFormData, registrationNumber: e.target.value})} 
-                                placeholder="Ex: 12345"
+                 <form onSubmit={handleSaveEdit} className="p-6 space-y-6 overflow-y-auto">
+                     <div className="space-y-4">
+                        <h4 className="text-xs uppercase font-bold text-gray-400 border-b border-gray-100 pb-2">Dados Cadastrais</h4>
+                         <div>
+                             <label className="text-xs uppercase font-bold text-gray-500">Nome Completo</label>
+                             <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" 
+                                value={editFormData.name || ''} 
+                                onChange={e => setEditFormData({...editFormData, name: e.target.value})} 
+                                required 
+                             />
+                         </div>
+                         <div>
+                            <label className="text-xs uppercase font-bold text-brand-600">Nº LGND (Inscrição)</label>
+                            <div className="relative">
+                                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-300" size={18} />
+                                <input type="text" className="w-full bg-brand-50 border border-brand-200 rounded-lg p-3 pl-10 font-mono font-bold text-brand-800" 
+                                    value={editFormData.registrationNumber || ''} 
+                                    onChange={e => setEditFormData({...editFormData, registrationNumber: e.target.value})} 
+                                    placeholder="Ex: 12345"
+                                />
+                            </div>
+                         </div>
+                         <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs uppercase font-bold text-gray-500">CPF</label>
+                                <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" 
+                                    value={editFormData.cpf || ''} 
+                                    onChange={e => setEditFormData({...editFormData, cpf: e.target.value})} 
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs uppercase font-bold text-gray-500">Telefone</label>
+                                <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" 
+                                    value={editFormData.phone || ''} 
+                                    onChange={e => setEditFormData({...editFormData, phone: e.target.value})} 
+                                />
+                            </div>
+                         </div>
+                         <div>
+                            <label className="text-xs uppercase font-bold text-gray-500">Email</label>
+                            <input type="email" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" 
+                                value={editFormData.email || ''} 
+                                onChange={e => setEditFormData({...editFormData, email: e.target.value})} 
                             />
-                        </div>
+                         </div>
                      </div>
-                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs uppercase font-bold text-gray-500">CPF</label>
-                            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" 
-                                value={editFormData.cpf || ''} 
-                                onChange={e => setEditFormData({...editFormData, cpf: e.target.value})} 
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs uppercase font-bold text-gray-500">Telefone</label>
-                            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" 
-                                value={editFormData.phone || ''} 
-                                onChange={e => setEditFormData({...editFormData, phone: e.target.value})} 
-                            />
-                        </div>
-                     </div>
-                     <div>
-                        <label className="text-xs uppercase font-bold text-gray-500">Email</label>
-                        <input type="email" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" 
-                            value={editFormData.email || ''} 
-                            onChange={e => setEditFormData({...editFormData, email: e.target.value})} 
-                        />
-                     </div>
-                     <div className="pt-4">
-                         <button type="submit" className="w-full bg-brand-500 text-white font-bold py-3 rounded-xl hover:bg-brand-600 transition-colors flex items-center justify-center gap-2">
+
+                     {/* Seção de Edição de Datas de Entrega */}
+                     {Object.keys(editDeliveryDates).length > 0 && (
+                         <div className="space-y-4">
+                            <h4 className="text-xs uppercase font-bold text-gray-400 border-b border-gray-100 pb-2">Editar Datas de Entrega</h4>
+                            <div className="space-y-3">
+                                {merchandise.map(item => {
+                                    if (!editDeliveryDates[item.id]) return null;
+                                    return (
+                                        <div key={item.id} className="flex items-center gap-4">
+                                            <span className="text-sm font-bold text-gray-700 w-1/3">{item.name}</span>
+                                            <input 
+                                                type="datetime-local" 
+                                                className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm text-gray-600"
+                                                value={editDeliveryDates[item.id]}
+                                                onChange={e => setEditDeliveryDates({...editDeliveryDates, [item.id]: e.target.value})}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                         </div>
+                     )}
+
+                     <div className="pt-4 sticky bottom-0 bg-white">
+                         <button type="submit" className="w-full bg-brand-500 text-white font-bold py-3 rounded-xl hover:bg-brand-600 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20">
                              <Save size={18} /> Salvar Alterações
                          </button>
                      </div>
@@ -564,21 +656,38 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                          <div className="space-y-2">
                              {merchandise.map(item => {
                                  const deliveredAt = selectedLegendario.deliveries?.[item.id];
+                                 const isDelivered = !!deliveredAt;
+
                                  return (
                                      <div key={item.id} className="flex justify-between items-center p-3 rounded-lg bg-gray-50 border border-gray-100">
                                          <span className="font-bold text-gray-700 text-sm">{item.name}</span>
-                                         {deliveredAt ? (
-                                             <div className="text-right">
-                                                 <span className="block text-xs font-bold text-emerald-600 flex items-center justify-end gap-1">
-                                                     <CheckCircle size={12} /> Entregue
-                                                 </span>
-                                                 <span className="text-[10px] text-gray-400">
-                                                     {new Date(deliveredAt).toLocaleString('pt-BR')}
-                                                 </span>
-                                             </div>
-                                         ) : (
-                                             <span className="text-xs text-gray-400 italic">Pendente</span>
-                                         )}
+                                         
+                                         {/* Botão de Toggle na Visualização */}
+                                         <button 
+                                            onClick={() => handleToggleDelivery(selectedLegendario, item)}
+                                            disabled={!isDelivered && item.currentStock <= 0}
+                                            className={`
+                                                flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all
+                                                ${isDelivered 
+                                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200' 
+                                                    : (item.currentStock <= 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-300 text-gray-500 hover:border-brand-500 hover:text-brand-500')}
+                                            `}
+                                         >
+                                             {isDelivered ? (
+                                                 <>
+                                                     <CheckCircle size={14} />
+                                                     <span>Entregue</span>
+                                                     <span className="text-[9px] font-normal ml-1 hidden sm:inline">
+                                                         {new Date(deliveredAt).toLocaleDateString('pt-BR')}
+                                                     </span>
+                                                 </>
+                                             ) : (
+                                                <>
+                                                    <Circle size={14} />
+                                                    <span>{item.currentStock <= 0 ? 'Sem Estoque' : 'Marcar'}</span>
+                                                </>
+                                             )}
+                                         </button>
                                      </div>
                                  );
                              })}

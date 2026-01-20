@@ -434,6 +434,15 @@ export const api = {
     return new Date().toISOString();
   },
 
+  // Atualizar data da entrega
+  updateDeliveryDate: async (legendarioId: string, merchandiseId: string, newDate: string) => {
+    const { error } = await supabase.from('deliveries')
+      .update({ delivered_at: newDate })
+      .match({ legendario_id: legendarioId, merchandise_id: merchandiseId });
+
+    if (error) throw error;
+  },
+
   // Cancelar entrega (Undo)
   undoDelivery: async (legendarioId: string, merchandiseId: string) => {
     // 1. Remover registro de entrega
