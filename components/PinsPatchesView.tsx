@@ -417,8 +417,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
             </div>
           </div>
 
-          {/* SEARCH & STOCK SUMMARY - Ajuste de Grid (Busca 75%, Estoque 25%) */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6 shrink-0">
+          {/* SEARCH & STOCK SUMMARY - Ajuste de Grid (Busca 60%, Estoque 40%) */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:gap-6 shrink-0">
               <div className="lg:col-span-3 relative">
                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                  <input 
@@ -430,7 +430,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                  />
               </div>
               {/* Stock List */}
-              <div className="lg:col-span-1 bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 overflow-x-auto custom-scrollbar min-h-[90px]">
+              <div className="lg:col-span-2 bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 overflow-x-auto custom-scrollbar min-h-[90px]">
                   {merchandise.length === 0 ? (
                       <div className="text-xs text-gray-400 w-full text-center">Nenhum item de estoque.</div>
                   ) : (
