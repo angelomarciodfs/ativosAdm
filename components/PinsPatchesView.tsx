@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MerchandiseItem, Legendario, ImportPreviewData, User } from '../types';
 import { api } from '../services/database';
-import { Search, Upload, CheckCircle, Circle, AlertTriangle, X, Check, Loader, FileSpreadsheet } from 'lucide-react';
+import { Search, Upload, CheckCircle, Circle, AlertTriangle, X, Check, Loader, FileSpreadsheet, Download } from 'lucide-react';
 // @ts-ignore
 import readXlsxFile from 'read-excel-file';
 
@@ -60,6 +60,64 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
     }, 500);
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, fetchLegendarios]);
+
+  // --- Lógica de Exportação ---
+  const handleExport = () => {
+    if (legendarios.length === 0) {
+        alert("Não há dados para exportar.");
+        return;
+    }
+
+    // 1. Cabeçalhos
+    const headers = [
+        "Nome",
+        "Telefone",
+        "CPF",
+        "Email",
+        "Nº Inscrição",
+        ...merchandise.map(m => m.name) // Colunas dinâmicas dos itens
+    ];
+
+    // 2. Linhas de Dados
+    const rows = legendarios.map(leg => {
+        // Dados básicos
+        const baseData = [
+            leg.name,
+            leg.phone || "",
+            leg.cpf || "",
+            leg.email || "",
+            leg.registrationNumber || ""
+        ];
+
+        // Dados de entrega (Datas ou vazio)
+        const itemsData = merchandise.map(item => {
+            const deliveryDateISO = leg.deliveries?.[item.id];
+            if (deliveryDateISO) {
+                const date = new Date(deliveryDateISO);
+                return date.toLocaleString('pt-BR'); // Formato dd/mm/aaaa hh:mm
+            }
+            return "";
+        });
+
+        return [...baseData, ...itemsData];
+    });
+
+    // 3. Montar CSV (Usando ponto e vírgula para Excel PT-BR)
+    const csvContent = [
+        headers.join(";"),
+        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
+    ].join("\n");
+
+    // 4. Download
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); // BOM para acentos
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `legendarios_entregas_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -235,6 +293,12 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
           <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Gestão de entregas e estoque de materiais.</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
+            <button 
+                onClick={handleExport}
+                className="flex items-center justify-center w-full md:w-auto gap-2 px-4 py-3 rounded-xl font-bold bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-all active:scale-95 shadow-sm"
+            >
+                <Download size={18} /> Exportar Excel
+            </button>
             <label className="flex items-center justify-center w-full md:w-auto gap-2 px-6 py-3 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 shadow-lg shadow-brand-500/20 cursor-pointer transition-all active:scale-95">
                 <Upload size={18} /> Importar (CSV / XLSX)
                 <input type="file" accept=".csv, .xlsx" className="hidden" onChange={handleFileUpload} />
