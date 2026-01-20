@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MerchandiseItem, Legendario, ImportPreviewData, User } from '../types';
 import { api } from '../services/database';
-import { Search, Upload, CheckCircle, Circle, AlertTriangle, X, Check, Loader, FileSpreadsheet, Download } from 'lucide-react';
+import { Search, Upload, CheckCircle, Circle, AlertTriangle, X, Check, Loader, FileSpreadsheet, Download, Pencil, Eye, Save, Calendar, Mail, Phone, Hash } from 'lucide-react';
 // @ts-ignore
 import readXlsxFile from 'read-excel-file';
 
@@ -20,6 +20,12 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreviewData[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Edit & View State
+  const [selectedLegendario, setSelectedLegendario] = useState<Legendario | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState<Partial<Legendario>>({});
 
   // Função centralizada para buscar legendários
   const fetchLegendarios = useCallback(async (term: string) => {
@@ -74,8 +80,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
         "Telefone",
         "CPF",
         "Email",
-        "Nº Inscrição",
-        ...merchandise.map(m => m.name) // Colunas dinâmicas dos itens
+        "Nº LGND", // Renomeado de Inscrição para LGND
+        ...merchandise.map(m => m.name)
     ];
 
     // 2. Linhas de Dados
@@ -94,7 +100,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
             const deliveryDateISO = leg.deliveries?.[item.id];
             if (deliveryDateISO) {
                 const date = new Date(deliveryDateISO);
-                return date.toLocaleString('pt-BR'); // Formato dd/mm/aaaa hh:mm
+                return date.toLocaleDateString('pt-BR'); // Alterado para apenas Data (dd/mm/aaaa)
             }
             return "";
         });
@@ -235,6 +241,43 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
       }
   };
 
+  // --- Handlers para View/Edit ---
+  
+  const handleEditClick = (legendario: Legendario) => {
+    setEditFormData({
+        name: legendario.name,
+        cpf: legendario.cpf,
+        email: legendario.email,
+        phone: legendario.phone,
+        registrationNumber: legendario.registrationNumber
+    });
+    setSelectedLegendario(legendario);
+    setIsEditModalOpen(true);
+  };
+
+  const handleViewClick = (legendario: Legendario) => {
+    setSelectedLegendario(legendario);
+    setIsViewModalOpen(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLegendario) return;
+
+    try {
+        await api.updateLegendario({ id: selectedLegendario.id, ...editFormData });
+        
+        // Atualiza estado local
+        setLegendarios(prev => prev.map(l => l.id === selectedLegendario.id ? { ...l, ...editFormData } : l));
+        
+        setIsEditModalOpen(false);
+        setSelectedLegendario(null);
+    } catch (error) {
+        console.error("Erro ao atualizar", error);
+        alert("Erro ao salvar alterações.");
+    }
+  };
+
   const handleToggleDelivery = async (legendario: Legendario, item: MerchandiseItem) => {
     if (!currentUser) return;
     const isDelivered = !!legendario.deliveries?.[item.id];
@@ -318,7 +361,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                 onChange={e => setSearchTerm(e.target.value)}
              />
           </div>
-          {/* Stock List - Improved scrolling and spacing */}
+          {/* Stock List */}
           <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 overflow-x-auto custom-scrollbar min-h-[90px]">
               {merchandise.length === 0 ? (
                   <div className="text-xs text-gray-400 w-full text-center">Nenhum item de estoque.</div>
@@ -355,15 +398,40 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                          <div key={leg.id} className="p-4 rounded-xl border border-gray-100 bg-white shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 hover:border-brand-200 hover:shadow-md transition-all">
                              {/* Informações do Legendário */}
                              <div className="flex-1 min-w-0 text-center md:text-left w-full md:w-auto">
-                                 <h4 className="text-lg font-bold text-gray-900 truncate">{leg.name}</h4>
-                                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 text-sm text-gray-500 mt-1">
+                                 <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+                                    <h4 className="text-lg font-bold text-gray-900 truncate">{leg.name}</h4>
+                                    
+                                    {/* Edit & View Buttons (Desktop/Inline) */}
+                                    <div className="flex gap-1 ml-2">
+                                        <button 
+                                            onClick={() => handleViewClick(leg)}
+                                            className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors" 
+                                            title="Ver Detalhes"
+                                        >
+                                            <Eye size={16} />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleEditClick(leg)}
+                                            className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors" 
+                                            title="Editar Cadastro"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                    </div>
+                                 </div>
+
+                                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 text-sm text-gray-500">
                                      <span className="font-mono bg-gray-100 px-1.5 rounded text-xs text-gray-600 font-bold">{leg.cpf}</span>
                                      <span className="truncate max-w-[200px]">{leg.email}</span>
-                                     {leg.registrationNumber && <span className="text-brand-600 font-bold">#{leg.registrationNumber}</span>}
+                                     {leg.registrationNumber ? (
+                                         <span className="text-brand-600 font-bold bg-brand-50 px-1.5 rounded border border-brand-100">LGND #{leg.registrationNumber}</span>
+                                     ) : (
+                                         <span className="text-gray-300 text-xs italic">Sem Nº LGND</span>
+                                     )}
                                  </div>
                              </div>
                              
-                             {/* Botões de Entrega (Flags) - Alinhados à direita */}
+                             {/* Botões de Entrega (Flags) */}
                              <div className="flex items-center gap-2 flex-wrap justify-center md:justify-end w-full md:w-auto">
                                  {merchandise.map(item => {
                                      const isDelivered = !!leg.deliveries?.[item.id];
@@ -373,14 +441,13 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                          <button
                                             key={item.id}
                                             onClick={() => handleToggleDelivery(leg, item)}
-                                            // Desabilitado apenas se não estiver entregue E não tiver estoque. Se já estiver entregue, permite clicar para desfazer.
                                             disabled={!isDelivered && item.currentStock <= 0}
-                                            title={isDelivered ? `Entregue em: ${deliveryDate} (Clique para desfazer)` : (item.currentStock <= 0 ? 'Sem Estoque' : `Entregar ${item.name}`)}
+                                            title={isDelivered ? `Entregue em: ${deliveryDate}` : (item.currentStock <= 0 ? 'Sem Estoque' : `Entregar ${item.name}`)}
                                             className={`
                                                 relative group flex flex-col items-center justify-center rounded-xl border-2 transition-all duration-200
                                                 w-14 h-14 md:w-16 md:h-16
                                                 ${isDelivered 
-                                                    ? 'bg-emerald-50 border-emerald-500 text-emerald-600 hover:bg-red-50 hover:border-red-500 hover:text-red-500' // Hover vermelho para indicar cancelamento
+                                                    ? 'bg-emerald-50 border-emerald-500 text-emerald-600 hover:bg-red-50 hover:border-red-500 hover:text-red-500' 
                                                     : (item.currentStock <= 0 
                                                         ? 'bg-gray-100 border-gray-200 text-gray-300 cursor-not-allowed'
                                                         : 'bg-white border-gray-200 text-gray-400 hover:border-brand-500 hover:text-brand-500 hover:shadow-lg hover:scale-105 active:scale-95')
@@ -388,17 +455,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                             `}
                                          >
                                              {isDelivered ? <CheckCircle size={20} className="mb-1 group-hover:hidden" /> : <Circle size={20} className="mb-1" />}
-                                             {/* Ícone de X aparece no hover quando já está entregue */}
                                              {isDelivered && <X size={20} className="mb-1 hidden group-hover:block" />}
-                                             
                                              <span className="text-[8px] md:text-[9px] font-bold text-center leading-tight px-0.5 line-clamp-2 uppercase tracking-tight">{item.name}</span>
-                                             
-                                             {/* Tooltip for Date */}
-                                             {isDelivered && (
-                                                 <div className="absolute bottom-full mb-2 right-0 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10 shadow-xl">
-                                                     {deliveryDate}
-                                                 </div>
-                                             )}
                                          </button>
                                      );
                                  })}
@@ -410,7 +468,128 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
          </div>
       </div>
 
-      {/* IMPORT MODAL */}
+      {/* EDIT MODAL */}
+      {isEditModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95">
+                 <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                     <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                        <Pencil className="text-brand-500" size={20} /> Editar Legendário
+                     </h3>
+                     <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-700"><X size={24} /></button>
+                 </div>
+                 <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+                     <div>
+                         <label className="text-xs uppercase font-bold text-gray-500">Nome Completo</label>
+                         <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" 
+                            value={editFormData.name || ''} 
+                            onChange={e => setEditFormData({...editFormData, name: e.target.value})} 
+                            required 
+                         />
+                     </div>
+                     <div>
+                        <label className="text-xs uppercase font-bold text-brand-600">Nº LGND (Inscrição)</label>
+                        <div className="relative">
+                            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-300" size={18} />
+                            <input type="text" className="w-full bg-brand-50 border border-brand-200 rounded-lg p-3 pl-10 font-mono font-bold text-brand-800" 
+                                value={editFormData.registrationNumber || ''} 
+                                onChange={e => setEditFormData({...editFormData, registrationNumber: e.target.value})} 
+                                placeholder="Ex: 12345"
+                            />
+                        </div>
+                     </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs uppercase font-bold text-gray-500">CPF</label>
+                            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" 
+                                value={editFormData.cpf || ''} 
+                                onChange={e => setEditFormData({...editFormData, cpf: e.target.value})} 
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs uppercase font-bold text-gray-500">Telefone</label>
+                            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" 
+                                value={editFormData.phone || ''} 
+                                onChange={e => setEditFormData({...editFormData, phone: e.target.value})} 
+                            />
+                        </div>
+                     </div>
+                     <div>
+                        <label className="text-xs uppercase font-bold text-gray-500">Email</label>
+                        <input type="email" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" 
+                            value={editFormData.email || ''} 
+                            onChange={e => setEditFormData({...editFormData, email: e.target.value})} 
+                        />
+                     </div>
+                     <div className="pt-4">
+                         <button type="submit" className="w-full bg-brand-500 text-white font-bold py-3 rounded-xl hover:bg-brand-600 transition-colors flex items-center justify-center gap-2">
+                             <Save size={18} /> Salvar Alterações
+                         </button>
+                     </div>
+                 </form>
+             </div>
+          </div>
+      )}
+
+      {/* VIEW DETAILS MODAL */}
+      {isViewModalOpen && selectedLegendario && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95">
+                 <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                     <div>
+                         <h3 className="text-xl font-black text-gray-900">{selectedLegendario.name}</h3>
+                         <p className="text-sm text-brand-600 font-bold">
+                             {selectedLegendario.registrationNumber ? `LGND #${selectedLegendario.registrationNumber}` : 'Sem número de inscrição'}
+                         </p>
+                     </div>
+                     <button onClick={() => setIsViewModalOpen(false)} className="text-gray-400 hover:text-gray-700"><X size={24} /></button>
+                 </div>
+                 <div className="p-6 space-y-6">
+                     <div className="space-y-3">
+                        <div className="flex items-center gap-3 text-sm text-gray-600">
+                            <Hash size={16} className="text-gray-400" /> <span className="font-mono">{selectedLegendario.cpf || 'CPF não informado'}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-gray-600">
+                            <Mail size={16} className="text-gray-400" /> <span>{selectedLegendario.email || 'Email não informado'}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-gray-600">
+                            <Phone size={16} className="text-gray-400" /> <span>{selectedLegendario.phone || 'Telefone não informado'}</span>
+                        </div>
+                     </div>
+                     
+                     <div className="border-t border-gray-100 pt-4">
+                         <h4 className="text-xs uppercase font-bold text-gray-500 mb-3 flex items-center gap-2">
+                             <Calendar size={14} /> Histórico de Entregas
+                         </h4>
+                         <div className="space-y-2">
+                             {merchandise.map(item => {
+                                 const deliveredAt = selectedLegendario.deliveries?.[item.id];
+                                 return (
+                                     <div key={item.id} className="flex justify-between items-center p-3 rounded-lg bg-gray-50 border border-gray-100">
+                                         <span className="font-bold text-gray-700 text-sm">{item.name}</span>
+                                         {deliveredAt ? (
+                                             <div className="text-right">
+                                                 <span className="block text-xs font-bold text-emerald-600 flex items-center justify-end gap-1">
+                                                     <CheckCircle size={12} /> Entregue
+                                                 </span>
+                                                 <span className="text-[10px] text-gray-400">
+                                                     {new Date(deliveredAt).toLocaleString('pt-BR')}
+                                                 </span>
+                                             </div>
+                                         ) : (
+                                             <span className="text-xs text-gray-400 italic">Pendente</span>
+                                         )}
+                                     </div>
+                                 );
+                             })}
+                         </div>
+                     </div>
+                 </div>
+             </div>
+          </div>
+      )}
+
+      {/* IMPORT MODAL (Mantido igual, apenas renderizado no final) */}
       {isImportModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col animate-in zoom-in-95">

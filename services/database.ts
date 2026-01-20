@@ -373,6 +373,19 @@ export const api = {
     });
   },
 
+  updateLegendario: async (legendario: Partial<Legendario> & { id: string }) => {
+    const { data, error } = await supabase.from('legendarios').update({
+      name: legendario.name,
+      cpf: legendario.cpf,
+      email: legendario.email,
+      phone: legendario.phone,
+      registration_number: legendario.registrationNumber
+    }).eq('id', legendario.id).select().single();
+
+    if (error) throw error;
+    return mapLegendario(data);
+  },
+
   // Importação em massa
   importLegendarios: async (legendarios: Omit<Legendario, 'id'>[]) => {
     const { data, error } = await supabase.from('legendarios').insert(
