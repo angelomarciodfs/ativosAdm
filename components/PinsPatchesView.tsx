@@ -394,66 +394,70 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
   };
 
   return (
-    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0 h-full flex flex-col">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Pins & Patches</h2>
-          <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Gestão de entregas e estoque de materiais.</p>
-        </div>
-        <div className="flex gap-2 w-full md:w-auto">
-            <button 
-                onClick={handleExport}
-                className="flex items-center justify-center w-full md:w-auto gap-2 px-4 py-3 rounded-xl font-bold bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-all active:scale-95 shadow-sm"
-            >
-                <Download size={18} /> Exportar Excel
-            </button>
-            <label className="flex items-center justify-center w-full md:w-auto gap-2 px-6 py-3 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 shadow-lg shadow-brand-500/20 cursor-pointer transition-all active:scale-95">
-                <Upload size={18} /> Importar (CSV / XLSX)
-                <input type="file" accept=".csv, .xlsx" className="hidden" onChange={handleFileUpload} />
-            </label>
-        </div>
-      </div>
-
-      {/* SEARCH & STOCK SUMMARY - Ajuste de Grid (Busca Maior 60%, Estoque Menor 40%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:gap-6 shrink-0">
-          <div className="lg:col-span-3 relative">
-             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-             <input 
-                type="text" 
-                placeholder="Pesquisar..." 
-                className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl shadow-sm text-lg focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-             />
+    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0">
+      
+      {/* HEADER SECTION (STICKY) */}
+      <div className="sticky top-0 z-20 bg-gray-50 pt-1 pb-4 -mt-2 space-y-4 md:space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Pins & Patches</h2>
+              <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Gestão de entregas e estoque de materiais.</p>
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+                <button 
+                    onClick={handleExport}
+                    className="flex items-center justify-center w-full md:w-auto gap-2 px-4 py-3 rounded-xl font-bold bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-all active:scale-95 shadow-sm"
+                >
+                    <Download size={18} /> Exportar Excel
+                </button>
+                <label className="flex items-center justify-center w-full md:w-auto gap-2 px-6 py-3 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 shadow-lg shadow-brand-500/20 cursor-pointer transition-all active:scale-95">
+                    <Upload size={18} /> Importar (CSV / XLSX)
+                    <input type="file" accept=".csv, .xlsx" className="hidden" onChange={handleFileUpload} />
+                </label>
+            </div>
           </div>
-          {/* Stock List */}
-          <div className="lg:col-span-2 bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 overflow-x-auto custom-scrollbar min-h-[90px]">
-              {merchandise.length === 0 ? (
-                  <div className="text-xs text-gray-400 w-full text-center">Nenhum item de estoque.</div>
-              ) : (
-                  merchandise.map(item => (
-                      <div key={item.id} className="min-w-[90px] flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 border border-gray-100 shrink-0">
-                          <span className="text-[10px] uppercase font-bold text-gray-400 text-center leading-tight h-6 overflow-hidden flex items-center">{item.name}</span>
-                          <span className={`text-xl font-black ${item.currentStock < item.minThreshold ? 'text-red-500' : 'text-gray-800'}`}>
-                              {item.currentStock}
-                          </span>
-                      </div>
-                  ))
-              )}
+
+          {/* SEARCH & STOCK SUMMARY - Ajuste de Grid (Busca 75%, Estoque 25%) */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6 shrink-0">
+              <div className="lg:col-span-3 relative">
+                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                 <input 
+                    type="text" 
+                    placeholder="Pesquisar..." 
+                    className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl shadow-sm text-lg focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                 />
+              </div>
+              {/* Stock List */}
+              <div className="lg:col-span-1 bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 overflow-x-auto custom-scrollbar min-h-[90px]">
+                  {merchandise.length === 0 ? (
+                      <div className="text-xs text-gray-400 w-full text-center">Nenhum item de estoque.</div>
+                  ) : (
+                      merchandise.map(item => (
+                          <div key={item.id} className="min-w-[90px] flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 border border-gray-100 shrink-0">
+                              <span className="text-[10px] uppercase font-bold text-gray-400 text-center leading-tight h-6 overflow-hidden flex items-center">{item.name}</span>
+                              <span className={`text-xl font-black ${item.currentStock < item.minThreshold ? 'text-red-500' : 'text-gray-800'}`}>
+                                  {item.currentStock}
+                              </span>
+                          </div>
+                      ))
+                  )}
+              </div>
           </div>
       </div>
 
       {/* RESULTS LIST */}
-      <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
          <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Resultados da Busca</span>
              <span className="text-xs font-bold text-gray-400">
                 {loading ? 'Carregando...' : `${legendarios.length} encontrados`}
              </span>
          </div>
-         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+         <div className="p-2">
              {legendarios.length === 0 && !loading ? (
-                 <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50 min-h-[200px]">
+                 <div className="flex flex-col items-center justify-center text-gray-400 opacity-50 min-h-[200px]">
                      <Search size={48} className="mb-4" />
                      <p className="font-medium text-center px-4">Nenhum legendário encontrado.</p>
                  </div>
