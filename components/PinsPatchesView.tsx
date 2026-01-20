@@ -1,10 +1,14 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MerchandiseItem, Legendario, ImportPreviewData, User } from '../types';
 import { api } from '../services/database';
-import { Search, Upload, CheckCircle, Circle, AlertTriangle, X, Check, Loader, FileSpreadsheet, Download, Pencil, Eye, Save, Calendar, Mail, Phone, Hash } from 'lucide-react';
+import { Search, Upload, CheckCircle, Circle, AlertTriangle, X, Check, Loader, FileSpreadsheet, Download, Pencil, Eye, Save, Calendar, Mail, Phone, Hash, ChevronDown, FileText } from 'lucide-react';
 // @ts-ignore
 import readXlsxFile from 'read-excel-file';
+// @ts-ignore
+import { jsPDF } from 'jspdf';
+// @ts-ignore
+import autoTable from 'jspdf-autotable';
 
 interface PinsPatchesViewProps {
   currentUser: User | null;
@@ -16,6 +20,10 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // Export Menu State
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
   // Import State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreviewData[]>([]);
@@ -27,6 +35,17 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<Legendario>>({});
   const [editDeliveryDates, setEditDeliveryDates] = useState<Record<string, string>>({});
+
+  // Fechar menu ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Função centralizada para buscar legendários
   const fetchLegendarios = useCallback(async (term: string) => {
@@ -69,7 +88,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
   }, [searchTerm, fetchLegendarios]);
 
   // --- Lógica de Exportação ---
-  const handleExport = () => {
+  
+  const handleExportExcel = () => {
     if (legendarios.length === 0) {
         alert("Não há dados para exportar.");
         return;
@@ -81,13 +101,12 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
         "Telefone",
         "CPF",
         "Email",
-        "Nº LGND", // Renomeado de Inscrição para LGND
+        "Nº LGND", 
         ...merchandise.map(m => m.name)
     ];
 
     // 2. Linhas de Dados
     const rows = legendarios.map(leg => {
-        // Dados básicos
         const baseData = [
             leg.name,
             leg.phone || "",
@@ -96,12 +115,11 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
             leg.registrationNumber || ""
         ];
 
-        // Dados de entrega (Datas ou vazio)
         const itemsData = merchandise.map(item => {
             const deliveryDateISO = leg.deliveries?.[item.id];
             if (deliveryDateISO) {
-                const date = new Date(deliveryDateISO);
-                return date.toLocaleDateString('pt-BR'); // Alterado para apenas Data (dd/mm/aaaa)
+                const date = new Date(deliveryDateISO as string);
+                return date.toLocaleDateString('pt-BR'); 
             }
             return "";
         });
@@ -109,14 +127,12 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
         return [...baseData, ...itemsData];
     });
 
-    // 3. Montar CSV (Usando ponto e vírgula para Excel PT-BR)
     const csvContent = [
         headers.join(";"),
         ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
     ].join("\n");
 
-    // 4. Download
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); // BOM para acentos
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
@@ -124,6 +140,52 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleExportPDF = () => {
+    if (legendarios.length === 0) {
+        alert("Não há dados para exportar.");
+        return;
+    }
+
+    const doc = new jsPDF();
+    
+    // Título e Data
+    doc.setFontSize(16);
+    doc.text("Relatório de Entregas - Pins & Patches", 14, 15);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 22);
+
+    // Preparar dados para tabela
+    const tableHead = [
+        ['Nome', 'LGND', ...merchandise.map(m => m.name)]
+    ];
+
+    const tableBody = legendarios.map(leg => {
+        return [
+            leg.name,
+            leg.registrationNumber || '-',
+            ...merchandise.map(item => {
+                const deliveryDateISO = leg.deliveries?.[item.id];
+                return deliveryDateISO ? 'SIM' : ''; // Para PDF, "SIM" ou Data curta fica melhor que data cheia se houver muitas colunas
+            })
+        ];
+    });
+
+    autoTable(doc, {
+        head: tableHead,
+        body: tableBody,
+        startY: 28,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [245, 158, 11], textColor: 255, fontStyle: 'bold' }, // Brand Color (Orange-500 equivalent)
+        alternateRowStyles: { fillColor: [250, 250, 250] },
+        theme: 'grid'
+    });
+
+    doc.save(`relatorio_entregas_${new Date().toISOString().slice(0,10)}.pdf`);
+    setIsExportMenuOpen(false);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,7 +320,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
         Object.entries(legendario.deliveries).forEach(([itemId, dateIso]) => {
             // Converter ISO para formato datetime-local (yyyy-MM-ddThh:mm)
             if (dateIso) {
-                dates[itemId] = new Date(dateIso).toISOString().slice(0, 16);
+                dates[itemId] = new Date(dateIso as string).toISOString().slice(0, 16);
             }
         });
     }
@@ -284,8 +346,8 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
         const promises = Object.entries(editDeliveryDates).map(async ([itemId, newDate]) => {
             const originalDate = selectedLegendario.deliveries?.[itemId];
             // Se a data mudou, atualiza no banco
-            if (originalDate && new Date(originalDate).toISOString().slice(0, 16) !== newDate) {
-                 await api.updateDeliveryDate(selectedLegendario.id, itemId, new Date(newDate).toISOString());
+            if (originalDate && new Date(originalDate as string).toISOString().slice(0, 16) !== newDate) {
+                 await api.updateDeliveryDate(selectedLegendario.id, itemId, new Date(newDate as string).toISOString());
             }
         });
 
@@ -404,12 +466,27 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
               <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Gestão de entregas e estoque de materiais.</p>
             </div>
             <div className="flex gap-2 w-full md:w-auto">
-                <button 
-                    onClick={handleExport}
-                    className="flex items-center justify-center w-full md:w-auto gap-2 px-4 py-3 rounded-xl font-bold bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-all active:scale-95 shadow-sm"
-                >
-                    <Download size={18} /> Exportar Excel
-                </button>
+                <div className="relative w-full md:w-auto" ref={exportMenuRef}>
+                    <button 
+                        onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                        className="flex items-center justify-center w-full md:w-auto gap-2 px-4 py-3 rounded-xl font-bold bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-all active:scale-95 shadow-sm"
+                    >
+                        <Download size={18} /> Exportar <ChevronDown size={14} className={`transition-transform ${isExportMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {isExportMenuOpen && (
+                        <div className="absolute top-full right-0 mt-2 w-full md:w-48 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                             <button onClick={handleExportExcel} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 text-sm font-bold text-gray-700">
+                                 <FileSpreadsheet size={16} className="text-emerald-600" /> Excel (CSV)
+                             </button>
+                             <div className="border-t border-gray-100"></div>
+                             <button onClick={handleExportPDF} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 text-sm font-bold text-gray-700">
+                                 <FileText size={16} className="text-red-600" /> PDF
+                             </button>
+                        </div>
+                    )}
+                </div>
+
                 <label className="flex items-center justify-center w-full md:w-auto gap-2 px-6 py-3 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 shadow-lg shadow-brand-500/20 cursor-pointer transition-all active:scale-95">
                     <Upload size={18} /> Importar (CSV / XLSX)
                     <input type="file" accept=".csv, .xlsx" className="hidden" onChange={handleFileUpload} />
@@ -435,7 +512,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                       <div className="text-xs text-gray-400 w-full text-center">Nenhum item de estoque.</div>
                   ) : (
                       merchandise.map(item => (
-                          <div key={item.id} className="min-w-[90px] flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 border border-gray-100 shrink-0">
+                          <div key={item.id} className="min-w-[100px] flex-1 flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 border border-gray-100 shrink-0 shadow-sm">
                               <span className="text-[10px] uppercase font-bold text-gray-400 text-center leading-tight h-6 overflow-hidden flex items-center">{item.name}</span>
                               <span className={`text-xl font-black ${item.currentStock < item.minThreshold ? 'text-red-500' : 'text-gray-800'}`}>
                                   {item.currentStock}
@@ -504,7 +581,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                              <div className="flex items-center gap-2 flex-wrap justify-center md:justify-end w-full md:w-auto">
                                  {merchandise.map(item => {
                                      const isDelivered = !!leg.deliveries?.[item.id];
-                                     const deliveryDate = isDelivered ? new Date(leg.deliveries![item.id]).toLocaleString('pt-BR') : '';
+                                     const deliveryDate = isDelivered ? new Date(leg.deliveries![item.id] as string).toLocaleString('pt-BR') : '';
 
                                      return (
                                          <button
@@ -682,7 +759,7 @@ export const PinsPatchesView: React.FC<PinsPatchesViewProps> = ({ currentUser })
                                                      <CheckCircle size={14} />
                                                      <span>Entregue</span>
                                                      <span className="text-[9px] font-normal ml-1 hidden sm:inline">
-                                                         {new Date(deliveredAt).toLocaleDateString('pt-BR')}
+                                                         {new Date(deliveredAt as string).toLocaleDateString('pt-BR')}
                                                      </span>
                                                  </>
                                              ) : (
