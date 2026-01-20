@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Radio, History, PlusCircle, Settings, LogOut, ClipboardList, Calendar, X, ArrowDownCircle, ChevronRight, Tag } from 'lucide-react';
+import { LayoutDashboard, Radio, History, PlusCircle, Settings, LogOut, ClipboardList, Calendar, X, ArrowDownCircle, ChevronRight, Tag, Package } from 'lucide-react';
 import { ViewState, User, Event } from '../types';
 import { SYSTEM_LOGO } from '../constants';
 
@@ -18,15 +18,6 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, currentUser, onLogout, onProfileClick, currentEvent, isOpen = false, onClose }) => {
   const isAdmin = currentUser?.role === 'ADMIN';
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
-    { id: 'rentals', label: 'Locações Ativas', icon: Radio, visible: true },
-    { id: 'pins-patches', label: 'Pins & Patches', icon: Tag, visible: true },
-    { id: 'reports', label: 'Relatório Evento', icon: ClipboardList, visible: true },
-    { id: 'history', label: 'Histórico', icon: History, visible: true },
-    { id: 'settings', label: 'Configurações', icon: Settings, visible: isAdmin }, // Only Admin
-  ];
-
   // Helper para formatar data sem conversão de fuso horário
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
@@ -43,6 +34,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, cur
   const handleNavigation = (view: ViewState) => {
       onChangeView(view);
       if (onClose) onClose();
+  };
+
+  const NavItem = ({ id, label, icon: Icon, visible = true, disabled = false }: { id: string, label: string, icon: any, visible?: boolean, disabled?: boolean }) => {
+      if (!visible) return null;
+      const isActive = currentView === id;
+      return (
+        <button
+            onClick={() => !disabled && handleNavigation(id as ViewState)}
+            disabled={disabled}
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all ${
+            isActive 
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20' 
+                : disabled 
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+        >
+            <Icon size={18} className={isActive ? 'text-white' : (disabled ? 'text-gray-300' : 'text-gray-500')} />
+            {label}
+        </button>
+      );
   };
 
   return (
@@ -68,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, cur
             alt="Legendários" 
             className="h-16 w-auto object-contain" 
           />
-          {/* Close Button for Mobile - Posicionado Absoluto para não quebrar a centralização da logo */}
+          {/* Close Button for Mobile */}
           <button onClick={onClose} className="md:hidden absolute right-4 text-gray-400 hover:text-gray-700">
              <X size={24} />
           </button>
@@ -76,13 +88,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, cur
         
         {/* Event Indicator */}
         <div className="px-4 pt-4 pb-2">
-            <div className="bg-brand-500/10 border border-brand-500/30 rounded-lg p-3">
-                <div className="text-[10px] uppercase text-brand-600 font-bold mb-1 flex items-center gap-1">
+            <div className={`border rounded-lg p-3 transition-colors ${currentEvent ? 'bg-brand-50 border-brand-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className={`text-[10px] uppercase font-bold mb-1 flex items-center gap-1 ${currentEvent ? 'text-brand-600' : 'text-gray-400'}`}>
                     <Calendar size={10} />
-                    Evento Ativo
+                    {currentEvent ? 'Evento Ativo' : 'Status do Sistema'}
                 </div>
-                <div className="text-sm font-bold text-gray-900 truncate leading-tight">
-                    {currentEvent ? currentEvent.name : 'Nenhum Evento Selecionado'}
+                <div className={`text-sm font-bold truncate leading-tight ${currentEvent ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                    {currentEvent ? currentEvent.name : 'Nenhum Evento Ativo'}
                 </div>
                 {currentEvent && (
                    <div className="text-[10px] text-gray-500 mt-1">
@@ -92,46 +104,51 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, cur
             </div>
         </div>
 
-        <div className="flex-1 py-4 px-4 space-y-1 overflow-y-auto">
-          <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Menu Principal</p>
-          {menuItems.filter(i => i.visible).map((item) => {
-            const Icon = item.icon;
-            const isActive = currentView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleNavigation(item.id as ViewState)}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all ${
-                  isActive 
-                    ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                <Icon size={18} />
-                {item.label}
-              </button>
-            );
-          })}
+        <div className="flex-1 py-4 px-4 overflow-y-auto custom-scrollbar">
           
-          <div className="pt-6 mt-4 border-t border-gray-100 space-y-2">
-               <button
-                onClick={() => handleNavigation('new-rental')}
-                disabled={!currentEvent}
-                className="w-full flex items-center justify-start gap-3 px-3 py-3 rounded-lg text-sm font-bold bg-white border border-gray-200 text-brand-600 hover:bg-brand-500 hover:text-white hover:border-brand-500 transition-all group disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-              >
-                <PlusCircle size={18} className="group-hover:rotate-90 transition-transform" />
-                Nova Locação
-              </button>
+          {/* GRUPO 1: GESTÃO DO EVENTO */}
+          <div className="mb-6">
+              <p className="px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Operação de Evento</p>
+              <div className="space-y-1">
+                  <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
+                  <NavItem id="rentals" label="Locações de Rádio" icon={Radio} disabled={!currentEvent} />
+                  <NavItem id="reports" label="Relatório Evento" icon={ClipboardList} disabled={!currentEvent} />
+              </div>
 
-              <button
-                onClick={() => handleNavigation('rentals')}
-                disabled={!currentEvent}
-                className="w-full flex items-center justify-start gap-3 px-3 py-3 rounded-lg text-sm font-bold bg-white border border-gray-200 text-blue-600 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all group disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-              >
-                <ArrowDownCircle size={18} />
-                Receber Devolução
-              </button>
+              {/* Ações Rápidas (Dependentes de Evento) */}
+              <div className="pt-3 mt-2 space-y-2">
+                <button
+                    onClick={() => handleNavigation('new-rental')}
+                    disabled={!currentEvent}
+                    className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-bold bg-white border border-gray-200 text-brand-600 hover:bg-brand-500 hover:text-white hover:border-brand-500 transition-all group disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                    <PlusCircle size={18} className="group-hover:rotate-90 transition-transform" />
+                    Nova Locação
+                </button>
+
+                <button
+                    onClick={() => handleNavigation('rentals')}
+                    disabled={!currentEvent}
+                    className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-bold bg-white border border-gray-200 text-blue-600 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all group disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                    <ArrowDownCircle size={18} />
+                    Receber Devolução
+                </button>
+              </div>
           </div>
+
+          <div className="border-t border-gray-100 my-4"></div>
+
+          {/* GRUPO 2: GESTÃO GLOBAL */}
+          <div className="mb-4">
+              <p className="px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Gestão Global</p>
+              <div className="space-y-1">
+                  <NavItem id="pins-patches" label="Pins & Patches" icon={Tag} />
+                  <NavItem id="history" label="Histórico Geral" icon={History} />
+                  <NavItem id="settings" label="Configurações" icon={Settings} visible={isAdmin} />
+              </div>
+          </div>
+
         </div>
 
         <div className="p-4 border-t border-gray-100 bg-gray-50">
