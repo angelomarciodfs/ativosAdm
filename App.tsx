@@ -21,13 +21,18 @@ const InventoryStatusChart = ({ equipment, rentals, items }: { equipment: Equipm
   const activeRentals = rentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
 
   const getStats = (itemName: string) => {
+      // Total de equipamentos físicos cadastrados nesta categoria
       const totalInventory = equipment.filter(e => e.category === itemName).length;
+      
+      // Cálculo preciso de itens locados cruzando serialNumber com a categoria do equipamento
       let totalRented = 0;
-      if (itemName === 'Radio') {
-          totalRented = activeRentals.length; 
-      } else {
-          totalRented = activeRentals.filter(r => r.radioModel.includes(itemName)).length;
-      }
+      activeRentals.forEach(rental => {
+          const eq = equipment.find(e => e.inventoryNumber === rental.serialNumber);
+          if (eq && eq.category === itemName) {
+              totalRented++;
+          }
+      });
+
       const available = Math.max(0, totalInventory - totalRented);
       const percentUsed = totalInventory > 0 ? (totalRented / totalInventory) * 100 : 0;
       return { totalInventory, totalRented, available, percentUsed };
@@ -35,7 +40,7 @@ const InventoryStatusChart = ({ equipment, rentals, items }: { equipment: Equipm
 
   const getIcon = (name: string) => {
       const n = name.toLowerCase();
-      if (n.includes('radio')) return Radio;
+      if (n.includes('radio') || n.includes('rádio')) return Radio;
       if (n.includes('fone') || n.includes('headset')) return Headphones;
       if (n.includes('power') || n.includes('bateria')) return Battery;
       if (n.includes('luz') || n.includes('lanterna')) return Lightbulb;
@@ -240,7 +245,6 @@ const App: React.FC = () => {
     try { 
         const newRental = await api.createRental(data, currentUser.id); 
         setRentals(prev => [newRental, ...prev]); 
-        // Nota: setView('rentals') foi removido para permitir que o RentalForm controle a exibição do recibo.
     } catch { 
         alert("Erro ao salvar."); 
     }
