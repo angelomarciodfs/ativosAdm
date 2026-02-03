@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Equipment, Sector, User, UserRole, Event, EquipmentItem, Channel, MerchandiseItem } from '../types';
-import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key, Radio as RadioIcon, Activity, Phone, Power, Check, X, Tag, AlertTriangle, RefreshCw, Server } from 'lucide-react';
+import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, Key, Radio as RadioIcon, Activity, Phone, Check, X, Tag } from 'lucide-react';
 import { api } from '../services/database';
 
 interface ConfigurationViewProps {
@@ -29,7 +29,7 @@ interface ConfigurationViewProps {
   onAddEvent: (event: Omit<Event, 'id'>) => void;
   onUpdateEvent: (event: Event) => void;
   onDeleteEvent: (id: string) => void;
-  activeTab: 'events' | 'inventory' | 'sectors' | 'users' | 'channels' | 'stock' | 'system';
+  activeTab: 'events' | 'inventory' | 'sectors' | 'users' | 'channels' | 'stock';
   setActiveTab: (tab: any) => void;
   inventorySubTab: 'ativos' | 'itens';
   setInventorySubTab: (tab: any) => void;
@@ -47,7 +47,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isResetting, setIsResetting] = useState(false);
   
   // Stock State (Loaded internally since it's only used here for config)
   const [merchandiseList, setMerchandiseList] = useState<MerchandiseItem[]>([]);
@@ -96,29 +95,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     setStockFormData({ name: '', currentStock: 0, minThreshold: 10 });
     setIsAdding(false);
     setEditingId(null);
-  };
-
-  const handleResetData = async () => {
-      if (!confirm("⚠️ ATENÇÃO: Isso irá apagar TODAS as locações de rádio e entregas de pins/patches registradas. Esta ação não pode ser desfeita. Deseja continuar?")) return;
-      
-      const confirmText = prompt("Para confirmar a exclusão de todos os dados de movimentação, digite a palavra: DELETAR");
-      if (confirmText !== "DELETAR") {
-          alert("Operação cancelada.");
-          return;
-      }
-
-      setIsResetting(true);
-      try {
-          await api.resetAllRentals();
-          await api.resetAllDeliveries();
-          alert("Dados de movimentação resetados com sucesso! O sistema está limpo para o início do evento.");
-          window.location.reload(); 
-      } catch (err) {
-          console.error(err);
-          alert("Erro ao limpar dados.");
-      } finally {
-          setIsResetting(false);
-      }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -187,16 +163,14 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Configurações</h2>
           <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Gestão centralizada do sistema.</p>
         </div>
-        {activeTab !== 'system' && (
-            <button 
-                onClick={() => { setIsAdding(!isAdding); if(isAdding) resetForms(); }}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg w-full md:w-auto justify-center ${
-                    isAdding ? 'bg-white text-red-600 border border-red-200 hover:bg-red-50' : 'bg-brand-500 text-white hover:bg-brand-600 shadow-brand-500/20'
-                }`}
-            >
-                {isAdding ? 'Cancelar' : <><Plus size={18} /> Novo Registro</>}
-            </button>
-        )}
+        <button 
+            onClick={() => { setIsAdding(!isAdding); if(isAdding) resetForms(); }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg w-full md:w-auto justify-center ${
+                isAdding ? 'bg-white text-red-600 border border-red-200 hover:bg-red-50' : 'bg-brand-500 text-white hover:bg-brand-600 shadow-brand-500/20'
+            }`}
+        >
+            {isAdding ? 'Cancelar' : <><Plus size={18} /> Novo Registro</>}
+        </button>
       </div>
 
       {/* TABS NAVIGATION */}
@@ -207,8 +181,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
             { id: 'channels', label: 'Canais', icon: RadioIcon },
             { id: 'sectors', label: 'Setores', icon: Users },
             { id: 'users', label: 'Usuários', icon: Shield },
-            { id: 'stock', label: 'Estoque', icon: Tag },
-            { id: 'system', label: 'Sistema', icon: Server }
+            { id: 'stock', label: 'Estoque', icon: Tag }
         ].map(tab => (
             <button 
               key={tab.id} 
@@ -239,57 +212,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           </div>
       )}
 
-      {/* SYSTEM / MAINTENANCE TAB */}
-      {activeTab === 'system' && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm space-y-8 animate-in slide-in-from-top-4 duration-300">
-              <div className="flex flex-col md:flex-row items-start gap-6 border-l-4 border-red-500 bg-red-50 p-6 rounded-r-xl">
-                  <div className="bg-red-100 p-3 rounded-full text-red-600">
-                      <AlertTriangle size={32} />
-                  </div>
-                  <div className="flex-1">
-                      <h3 className="text-xl font-black text-red-900 uppercase">Zona de Perigo: Reset de Movimentações</h3>
-                      <p className="text-red-700 mt-1 font-medium">Use esta função somente para limpar dados de teste antes do início real do evento. Isso apagará permanentemente todas as locações de rádio e entregas de pins sem afetar cadastros fixos.</p>
-                      
-                      <button 
-                        onClick={handleResetData}
-                        disabled={isResetting}
-                        className="mt-6 flex items-center gap-2 px-8 py-4 bg-red-600 text-white rounded-xl font-black uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-xl shadow-red-600/20 active:scale-95 disabled:opacity-50"
-                      >
-                          {isResetting ? <RefreshCw className="animate-spin" size={18} /> : <Trash2 size={18} />}
-                          Zerar Dados de Teste
-                      </button>
-                  </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="p-6 bg-gray-50 rounded-xl border border-gray-200">
-                      <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
-                          <Check size={16} className="text-emerald-500" /> O que SERÁ apagado:
-                      </h4>
-                      <ul className="text-sm text-gray-600 space-y-2">
-                          <li>• Todas as locações ativas e encerradas</li>
-                          <li>• Histórico de devoluções e pendências</li>
-                          <li>• Registro de quem entregou cada pin/patch</li>
-                          <li>• Logs de sistema temporários</li>
-                      </ul>
-                  </div>
-                  <div className="p-6 bg-gray-50 rounded-xl border border-gray-200">
-                      <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
-                          <X size={16} className="text-red-500" /> O que NÃO será apagado:
-                      </h4>
-                      <ul className="text-sm text-gray-600 space-y-2">
-                          <li>• Cadastro de Rádios e Patrimônios</li>
-                          <li>• Usuários do sistema e senhas</li>
-                          <li>• Canais de rádio e Setores cadastrados</li>
-                          <li>• Configurações de eventos</li>
-                      </ul>
-                  </div>
-              </div>
-          </div>
-      )}
-
       {/* FORMS SECTION */}
-      {isAdding && activeTab !== 'system' && (
+      {isAdding && (
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-2xl animate-in slide-in-from-top-4 duration-300">
             <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-100 pb-3 uppercase tracking-tighter">
                 <Plus size={20} className="text-brand-500" /> 
@@ -429,7 +353,7 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                         <div className="space-y-1">
                             <label className="text-xs uppercase text-gray-500 font-bold">{editingId ? 'Nova Senha (vazio para não alterar)' : 'Senha Inicial'}</label>
                             <div className="relative">
-                                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                 <input 
                                     type="password" 
                                     placeholder="Mínimo 6 caracteres" 
@@ -460,185 +384,183 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           </div>
       )}
 
-      {/* LIST SECTION (Hidden on System Tab) */}
-      {activeTab !== 'system' && (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-                <h3 className="text-lg font-black text-gray-900 tracking-tight">Base de Dados</h3>
-                <span className="bg-gray-100 text-[10px] font-black text-gray-500 px-2.5 py-1 rounded-full border border-gray-200 uppercase tracking-tighter">
-                    {filteredData().length} Itens
-                </span>
-            </div>
-            <div className="relative w-full md:w-auto">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                <input type="text" placeholder="Buscar nesta aba..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm w-full md:w-72 focus:ring-1 focus:ring-brand-500 focus:outline-none" />
-            </div>
-            </div>
+      {/* LIST SECTION */}
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+              <h3 className="text-lg font-black text-gray-900 tracking-tight">Base de Dados</h3>
+              <span className="bg-gray-100 text-[10px] font-black text-gray-500 px-2.5 py-1 rounded-full border border-gray-200 uppercase tracking-tighter">
+                  {filteredData().length} Itens
+              </span>
+          </div>
+          <div className="relative w-full md:w-auto">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+              <input type="text" placeholder="Buscar nesta aba..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm w-full md:w-72 focus:ring-1 focus:ring-brand-500 focus:outline-none" />
+          </div>
+          </div>
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black">
-                            <th className="p-4 md:p-6">
-                                {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Categoria' : 
-                                activeTab === 'sectors' ? 'Sigla' : 
-                                activeTab === 'channels' ? 'Canal' : 
-                                activeTab === 'stock' ? 'Item de Estoque' : 'Identificação'}
-                            </th>
-                            <th className="p-4 md:p-6 hidden md:table-cell">
-                                {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado em' : 
-                                activeTab === 'sectors' ? 'Coordenador' : 
-                                activeTab === 'channels' ? 'Frequência' : 
-                                activeTab === 'stock' ? 'Alerta Mínimo' : 'Status/Info'}
-                            </th>
-                            <th className="p-4 md:p-6">
-                                {activeTab === 'sectors' ? 'Canal' : 
-                                activeTab === 'users' ? 'Status de Acesso' : 
-                                activeTab === 'channels' ? 'Sinal' : 
-                                activeTab === 'stock' ? 'Saldo Atual' : ''}
-                            </th>
-                            <th className="p-4 md:p-6 text-right">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {filteredData().length === 0 ? (
-                            <tr><td colSpan={4} className="p-16 text-center text-gray-400 italic font-medium">Nenhum registro encontrado.</td></tr>
-                        ) : (
-                            filteredData().map((item: any) => {
-                                const channelInfo = activeTab === 'sectors' ? resolveChannelInfo(item.channelId) : null;
-                                return (
-                                    <tr key={item.id} className="hover:bg-brand-50/10 transition-colors group">
-                                        <td className="p-4 md:p-6">
-                                            <div className="flex flex-col">
-                                                {activeTab === 'events' && <div className="font-bold text-gray-900">{item.name}</div>}
-                                                {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
-                                                    <>
-                                                        <span className="font-mono text-brand-600 font-black text-sm">{item.inventoryNumber}</span>
-                                                        <span className="text-[10px] text-gray-400 uppercase font-bold md:hidden">{item.category} | {item.brand}</span>
-                                                    </>
-                                                )}
-                                                {activeTab === 'inventory' && inventorySubTab === 'itens' && <span className="font-bold text-gray-900">{item.name}</span>}
-                                                {activeTab === 'sectors' && (
-                                                    <>
-                                                        <div className="font-black text-gray-900 tracking-tighter text-base">{item.name}</div>
-                                                        <div className="text-[10px] text-brand-600 font-bold md:hidden">{item.coordinatorName}</div>
-                                                    </>
-                                                )}
-                                                {activeTab === 'channels' && (
-                                                    <>
-                                                        <div className="font-black text-gray-900 font-mono text-base">{item.name}</div>
-                                                        <div className="text-[10px] text-brand-600 font-bold md:hidden">{item.frequency} MHz</div>
-                                                    </>
-                                                )}
-                                                {activeTab === 'users' && (
-                                                    <>
-                                                        <div className="font-bold text-gray-900 text-sm">{item.name}</div>
-                                                        <div className="text-[10px] text-gray-400 font-mono md:hidden">{item.email}</div>
-                                                    </>
-                                                )}
-                                                {activeTab === 'stock' && (
-                                                    <div className="font-bold text-gray-900">{item.name}</div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-4 md:p-6 hidden md:table-cell text-sm">
-                                            {activeTab === 'events' && <div className="text-gray-600 font-medium">{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>}
-                                            {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-xs text-gray-500 uppercase font-bold">{item.category} | {item.brand} {item.model}</div>}
-                                            {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="text-gray-500 font-mono text-xs"><Clock size={12} className="inline mr-1"/> {formatDate(item.createdAt)}</div>}
-                                            {activeTab === 'sectors' && (
-                                                <div className="space-y-1">
-                                                    <div className="font-bold text-gray-800">{item.coordinatorName || '-'}</div>
-                                                    <div className="flex items-center gap-1.5 text-xs text-brand-600 font-bold">
-                                                        <Phone size={12} /> {item.coordinatorPhone || '-'}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {activeTab === 'channels' && <div className="text-xs font-bold text-brand-600">{item.frequency} MHz</div>}
-                                            {activeTab === 'users' && <div className="text-xs font-black text-brand-600 uppercase">{item.role}</div>}
-                                            {activeTab === 'stock' && <div className="text-xs text-gray-500">Mín: <span className="font-bold">{item.minThreshold}</span></div>}
-                                        </td>
-                                        <td className="p-4 md:p-6">
-                                            {activeTab === 'events' && (
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
-                                                    {item.isActive ? 'Ativo' : 'Finalizado'}
-                                                </span>
-                                            )}
-                                            {activeTab === 'users' && (
-                                                <button 
-                                                    onClick={() => onUpdateUser({ ...item, isActive: !item.isActive })}
-                                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
-                                                        item.isActive 
-                                                        ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-500/20' 
-                                                        : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200'
-                                                    }`}
-                                                >
-                                                    {item.isActive ? <Check size={12}/> : <X size={12}/>}
-                                                    {item.isActive ? 'Ativo' : 'Inativo'}
-                                                </button>
-                                            )}
-                                            {activeTab === 'channels' && <div className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{item.type}</div>}
-                                            {activeTab === 'sectors' && (
-                                                channelInfo ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <RadioIcon size={14} className="text-brand-500 flex-shrink-0" />
-                                                        <div className="flex flex-col">
-                                                            <span className="text-xs text-brand-600 font-black font-mono">{channelInfo.name}</span>
-                                                            <span className="text-[9px] text-gray-400 font-bold">{channelInfo.frequency} MHz</span>
-                                                        </div>
-                                                    </div>
-                                                ) : <span className="text-[10px] text-gray-300 italic">S/ Vínculo</span>
-                                            )}
-                                            {activeTab === 'stock' && (
-                                                <div className={`font-mono font-bold text-lg ${item.currentStock <= item.minThreshold ? 'text-red-600' : 'text-emerald-600'}`}>
-                                                    {item.currentStock}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="p-4 md:p-6 text-right space-x-1 whitespace-nowrap">
-                                            <button 
-                                                onClick={() => {
-                                                    if (activeTab === 'events') setEventFormData({name: item.name, startDate: item.startDate, endDate: item.endDate, isActive: item.isActive});
-                                                    if (activeTab === 'inventory' && inventorySubTab === 'ativos') setEqFormData({inventoryNumber: item.inventoryNumber, brand: item.brand, model: item.model, category: item.category});
-                                                    if (activeTab === 'inventory' && inventorySubTab === 'itens') setItemFormData({name: item.name});
-                                                    if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || '', channelId: item.channelId || ''});
-                                                    if (activeTab === 'channels') setChannelFormData({name: item.name, frequency: item.frequency, type: item.type});
-                                                    if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: '', isActive: item.isActive});
-                                                    if (activeTab === 'stock') setStockFormData({ name: item.name, currentStock: item.currentStock, minThreshold: item.minThreshold });
-                                                    setEditingId(item.id);
-                                                    setIsAdding(true);
-                                                }}
-                                                className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all"
-                                            ><Pencil size={16}/></button>
-                                            <button 
-                                                onClick={async () => {
-                                                    if (confirm('Deseja excluir permanentemente?')) {
-                                                        if (activeTab === 'events') onDeleteEvent(item.id);
-                                                        if (activeTab === 'inventory') {
-                                                            if (inventorySubTab === 'ativos') onDeleteEquipment(item.id);
-                                                            else onDeleteItem(item.id);
-                                                        }
-                                                        if (activeTab === 'sectors') onDeleteSector(item.id);
-                                                        if (activeTab === 'channels') onDeleteChannel(item.id);
-                                                        if (activeTab === 'users') onDeleteUser(item.id);
-                                                        if (activeTab === 'stock') {
-                                                            await api.deleteMerchandise(item.id);
-                                                            api.fetchMerchandise().then(setMerchandiseList);
-                                                        }
-                                                    }
-                                                }}
-                                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                            ><Trash2 size={16}/></button>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-      )}
+          <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                  <thead>
+                      <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black">
+                          <th className="p-4 md:p-6">
+                              {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Categoria' : 
+                              activeTab === 'sectors' ? 'Sigla' : 
+                              activeTab === 'channels' ? 'Canal' : 
+                              activeTab === 'stock' ? 'Item de Estoque' : 'Identificação'}
+                          </th>
+                          <th className="p-4 md:p-6 hidden md:table-cell">
+                              {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado em' : 
+                              activeTab === 'sectors' ? 'Coordenador' : 
+                              activeTab === 'channels' ? 'Frequência' : 
+                              activeTab === 'stock' ? 'Alerta Mínimo' : 'Status/Info'}
+                          </th>
+                          <th className="p-4 md:p-6">
+                              {activeTab === 'sectors' ? 'Canal' : 
+                              activeTab === 'users' ? 'Status de Acesso' : 
+                              activeTab === 'channels' ? 'Sinal' : 
+                              activeTab === 'stock' ? 'Saldo Atual' : ''}
+                          </th>
+                          <th className="p-4 md:p-6 text-right">Ações</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                      {filteredData().length === 0 ? (
+                          <tr><td colSpan={4} className="p-16 text-center text-gray-400 italic font-medium">Nenhum registro encontrado.</td></tr>
+                      ) : (
+                          filteredData().map((item: any) => {
+                              const channelInfo = activeTab === 'sectors' ? resolveChannelInfo(item.channelId) : null;
+                              return (
+                                  <tr key={item.id} className="hover:bg-brand-50/10 transition-colors group">
+                                      <td className="p-4 md:p-6">
+                                          <div className="flex flex-col">
+                                              {activeTab === 'events' && <div className="font-bold text-gray-900">{item.name}</div>}
+                                              {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
+                                                  <>
+                                                      <span className="font-mono text-brand-600 font-black text-sm">{item.inventoryNumber}</span>
+                                                      <span className="text-[10px] text-gray-400 uppercase font-bold md:hidden">{item.category} | {item.brand}</span>
+                                                  </>
+                                              )}
+                                              {activeTab === 'inventory' && inventorySubTab === 'itens' && <span className="font-bold text-gray-900">{item.name}</span>}
+                                              {activeTab === 'sectors' && (
+                                                  <>
+                                                      <div className="font-black text-gray-900 tracking-tighter text-base">{item.name}</div>
+                                                      <div className="text-[10px] text-brand-600 font-bold md:hidden">{item.coordinatorName}</div>
+                                                  </>
+                                              )}
+                                              {activeTab === 'channels' && (
+                                                  <>
+                                                      <div className="font-black text-gray-900 font-mono text-base">{item.name}</div>
+                                                      <div className="text-[10px] text-brand-600 font-bold md:hidden">{item.frequency} MHz</div>
+                                                  </>
+                                              )}
+                                              {activeTab === 'users' && (
+                                                  <>
+                                                      <div className="font-bold text-gray-900 text-sm">{item.name}</div>
+                                                      <div className="text-[10px] text-gray-400 font-mono md:hidden">{item.email}</div>
+                                                  </>
+                                              )}
+                                              {activeTab === 'stock' && (
+                                                  <div className="font-bold text-gray-900">{item.name}</div>
+                                              )}
+                                          </div>
+                                      </td>
+                                      <td className="p-4 md:p-6 hidden md:table-cell text-sm">
+                                          {activeTab === 'events' && <div className="text-gray-600 font-medium">{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>}
+                                          {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-xs text-gray-500 uppercase font-bold">{item.category} | {item.brand} {item.model}</div>}
+                                          {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="text-gray-500 font-mono text-xs"><Clock size={12} className="inline mr-1"/> {formatDate(item.createdAt)}</div>}
+                                          {activeTab === 'sectors' && (
+                                              <div className="space-y-1">
+                                                  <div className="font-bold text-gray-800">{item.coordinatorName || '-'}</div>
+                                                  <div className="flex items-center gap-1.5 text-xs text-brand-600 font-bold">
+                                                      <Phone size={12} /> {item.coordinatorPhone || '-'}
+                                                  </div>
+                                              </div>
+                                          )}
+                                          {activeTab === 'channels' && <div className="text-xs font-bold text-brand-600">{item.frequency} MHz</div>}
+                                          {activeTab === 'users' && <div className="text-xs font-black text-brand-600 uppercase">{item.role}</div>}
+                                          {activeTab === 'stock' && <div className="text-xs text-gray-500">Mín: <span className="font-bold">{item.minThreshold}</span></div>}
+                                      </td>
+                                      <td className="p-4 md:p-6">
+                                          {activeTab === 'events' && (
+                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                                                  {item.isActive ? 'Ativo' : 'Finalizado'}
+                                              </span>
+                                          )}
+                                          {activeTab === 'users' && (
+                                              <button 
+                                                  onClick={() => onUpdateUser({ ...item, isActive: !item.isActive })}
+                                                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
+                                                      item.isActive 
+                                                      ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-500/20' 
+                                                      : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200'
+                                                  }`}
+                                              >
+                                                  {item.isActive ? <Check size={12}/> : <X size={12}/>}
+                                                  {item.isActive ? 'Ativo' : 'Inativo'}
+                                              </button>
+                                          )}
+                                          {activeTab === 'channels' && <div className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{item.type}</div>}
+                                          {activeTab === 'sectors' && (
+                                              channelInfo ? (
+                                                  <div className="flex items-center gap-2">
+                                                      <RadioIcon size={14} className="text-brand-500 flex-shrink-0" />
+                                                      <div className="flex flex-col">
+                                                          <span className="text-xs text-brand-600 font-black font-mono">{channelInfo.name}</span>
+                                                          <span className="text-[9px] text-gray-400 font-bold">{channelInfo.frequency} MHz</span>
+                                                      </div>
+                                                  </div>
+                                              ) : <span className="text-[10px] text-gray-300 italic">S/ Vínculo</span>
+                                          )}
+                                          {activeTab === 'stock' && (
+                                              <div className={`font-mono font-bold text-lg ${item.currentStock <= item.minThreshold ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                  {item.currentStock}
+                                              </div>
+                                          )}
+                                      </td>
+                                      <td className="p-4 md:p-6 text-right space-x-1 whitespace-nowrap">
+                                          <button 
+                                              onClick={() => {
+                                                  if (activeTab === 'events') setEventFormData({name: item.name, startDate: item.startDate, endDate: item.endDate, isActive: item.isActive});
+                                                  if (activeTab === 'inventory' && inventorySubTab === 'ativos') setEqFormData({inventoryNumber: item.inventoryNumber, brand: item.brand, model: item.model, category: item.category});
+                                                  if (activeTab === 'inventory' && inventorySubTab === 'itens') setItemFormData({name: item.name});
+                                                  if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || '', channelId: item.channelId || ''});
+                                                  if (activeTab === 'channels') setChannelFormData({name: item.name, frequency: item.frequency, type: item.type});
+                                                  if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: '', isActive: item.isActive});
+                                                  if (activeTab === 'stock') setStockFormData({ name: item.name, currentStock: item.currentStock, minThreshold: item.minThreshold });
+                                                  setEditingId(item.id);
+                                                  setIsAdding(true);
+                                              }}
+                                              className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all"
+                                          ><Pencil size={16}/></button>
+                                          <button 
+                                              onClick={async () => {
+                                                  if (confirm('Deseja excluir permanentemente?')) {
+                                                      if (activeTab === 'events') onDeleteEvent(item.id);
+                                                      if (activeTab === 'inventory') {
+                                                          if (inventorySubTab === 'ativos') onDeleteEquipment(item.id);
+                                                          else onDeleteItem(item.id);
+                                                      }
+                                                      if (activeTab === 'sectors') onDeleteSector(item.id);
+                                                      if (activeTab === 'channels') onDeleteChannel(item.id);
+                                                      if (activeTab === 'users') onDeleteUser(item.id);
+                                                      if (activeTab === 'stock') {
+                                                          await api.deleteMerchandise(item.id);
+                                                          api.fetchMerchandise().then(setMerchandiseList);
+                                                      }
+                                                  }
+                                              }}
+                                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                          ><Trash2 size={16}/></button>
+                                      </td>
+                                  </tr>
+                              );
+                          })
+                      )}
+                  </tbody>
+              </table>
+          </div>
+      </div>
     </div>
   );
 };
