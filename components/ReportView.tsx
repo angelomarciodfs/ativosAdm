@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { Rental, RentalStatus, Equipment, User, Event, Sector, RentalAccessories } from '../types';
-import { Copy, Check, MessageCircle, AlertTriangle, Radio, Activity, Calendar, Users, AlertCircle } from 'lucide-react';
+import { Copy, Check, MessageCircle, AlertTriangle, Radio, Activity, Calendar, Users, AlertCircle, Package } from 'lucide-react';
 
 interface ReportViewProps {
   rentals: Rental[];
@@ -14,23 +15,15 @@ export const ReportView: React.FC<ReportViewProps> = ({ rentals, equipment, curr
   const [copied, setCopied] = useState(false);
 
   // --- FILTRO POR EVENTO ---
-  // Apenas locações deste evento
   const eventRentals = rentals.filter(r => r.eventId === currentEvent?.id);
-  
   const activeRentals = eventRentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
   const overdueRentals = eventRentals.filter(r => r.status === RentalStatus.OVERDUE);
   const partialRentals = eventRentals.filter(r => r.status === RentalStatus.PARTIAL);
   const completedRentals = eventRentals.filter(r => r.status === RentalStatus.COMPLETED);
 
-  const totalRadios = equipment.filter(e => e.category === 'Radio').length;
-  // Calculando disponíveis considerando apenas o que saiu neste evento (e ainda não voltou)
-  const activeRadiosInEvent = activeRentals.length;
-  const availableRadios = Math.max(0, totalRadios - activeRadiosInEvent);
-
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
     if (dateString.includes('T')) return new Date(dateString).toLocaleDateString('pt-BR');
-    
     const parts = dateString.split('-');
     if (parts.length === 3) {
         const [year, month, day] = parts;
@@ -39,15 +32,39 @@ export const ReportView: React.FC<ReportViewProps> = ({ rentals, equipment, curr
     return dateString;
   };
 
-  // --- AGREGAÇÃO POR SETOR ---
-  const rentalsBySector = eventRentals.reduce((acc, rental) => {
+  // --- CÁLCULO DE INVENTÁRIO POR TIPO ---
+  const inventoryByType = equipment.reduce((acc, eq) => {
+    const category = eq.category || 'Outros';
+    if (!acc[category]) {
+      acc[category] = { total: 0, inUse: 0 };
+    }
+    acc[category].total++;
+    // Verifica se esse equipamento específico está em uma locação ativa
+    const isCurrentlyRented = activeRentals.some(r => r.serialNumber === eq.inventoryNumber);
+    if (isCurrentlyRented) {
+      acc[category].inUse++;
+    }
+    return acc;
+  }, {} as Record<string, { total: number, inUse: number }>);
+
+  // --- AGREGAÇÃO POR SETOR COM DETALHAMENTO DE ITENS ---
+  const sectorDetails = eventRentals.reduce((acc, rental) => {
       const sectorName = rental.clientCompany || 'INDEFINIDO';
       if (!acc[sectorName]) {
-          acc[sectorName] = 0;
+          acc[sectorName] = { 
+            rentals: [],
+            counts: {} as Record<string, number> 
+          };
       }
-      acc[sectorName]++;
+      acc[sectorName].rentals.push(rental);
+      
+      // Encontrar categoria do rádio original para contagem precisa por tipo
+      const eq = equipment.find(e => e.inventoryNumber === rental.serialNumber);
+      const category = eq?.category || 'Rádio';
+      acc[sectorName].counts[category] = (acc[sectorName].counts[category] || 0) + 1;
+      
       return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, { rentals: Rental[], counts: Record<string, number> }>);
 
   const getCoordinatorName = (sectorName: string) => {
       const sector = sectors.find(s => s.name === sectorName);
@@ -57,9 +74,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ rentals, equipment, curr
   const getMissingItemsList = (r: Rental) => {
       if (!r.accessories) return '';
       const missing: string[] = [];
-      // CORREÇÃO AQUI: Cast para Partial<RentalAccessories> permite indexação
       const returned = (r.returnedAccessories || {}) as Partial<RentalAccessories>;
-      
       const labels: Record<string, string> = {
          charger: 'Carregador',
          powerBank: 'PowerBank',
@@ -67,7 +82,6 @@ export const ReportView: React.FC<ReportViewProps> = ({ rentals, equipment, curr
          antenna: 'Antena',
          clip: 'Clip'
       };
-
       (Object.keys(r.accessories) as Array<keyof RentalAccessories>).forEach(key => {
           if (r.accessories[key] && !returned[key]) {
               missing.push(labels[key]);
@@ -84,17 +98,22 @@ export const ReportView: React.FC<ReportViewProps> = ({ rentals, equipment, curr
     message += `📅 *Período:* ${formatDate(currentEvent.startDate)} a ${formatDate(currentEvent.endDate)}\n\n`;
     
     message += `*STATUS DO INVENTÁRIO (Geral)*\n`;
-    message += `📦 Equipamentos Total: ${totalRadios}\n`;
-    message += `🟢 Disponíveis na Base: ${availableRadios}\n`;
-    message += `🔴 Em Uso (Neste Evento): ${activeRadiosInEvent}\n`;
+    Object.entries(inventoryByType).forEach(([category, stats]) => {
+      const available = stats.total - stats.inUse;
+      message += `📦 *${category}s:* ${stats.total} Total | ${available} Disp | ${stats.inUse} Uso\n`;
+    });
     message += `--------------------------------\n\n`;
 
     message += `*MOVIMENTAÇÃO POR SETOR*\n`;
-    const sortedSectors = Object.entries(rentalsBySector).sort((a, b) => (b[1] as number) - (a[1] as number));
+    const sortedSectors = Object.entries(sectorDetails).sort((a, b) => b[1].rentals.length - a[1].rentals.length);
     
     if (sortedSectors.length > 0) {
-        sortedSectors.forEach(([name, count]) => {
-            message += `🏢 *${name}* (${count} Rádios)\n`;
+        sortedSectors.forEach(([name, data]) => {
+            const countsStr = Object.entries(data.counts)
+              .map(([cat, qty]) => `${qty} ${cat}${qty > 1 ? 's' : ''}`)
+              .join(', ');
+              
+            message += `🏢 *${name}* (${countsStr})\n`;
             message += `   👤 Resp: ${getCoordinatorName(name)}\n`;
         });
     } else {
@@ -129,7 +148,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ rentals, equipment, curr
         }
     }
 
-    message += `_Sistema RadioTrack - Legendários_`;
+    message += `_Sistema de Ativos - Legendários_`;
     return message;
   };
 
@@ -149,136 +168,178 @@ export const ReportView: React.FC<ReportViewProps> = ({ rentals, equipment, curr
       );
   }
 
-  const sortedSectorsForUI = Object.entries(rentalsBySector).sort((a, b) => (b[1] as number) - (a[1] as number));
+  const sortedSectorsForUI = Object.entries(sectorDetails).sort((a, b) => b[1].rentals.length - a[1].rentals.length);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto">
+    <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b border-gray-200 pb-6">
         <div>
           <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Relatório do Evento</h2>
-          <p className="text-brand-600 mt-1 font-bold">{currentEvent.name}</p>
+          <p className="text-brand-600 mt-1 font-bold uppercase tracking-widest text-sm">{currentEvent.name}</p>
         </div>
         <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-gray-400 uppercase">Gerado em: {new Date().toLocaleDateString('pt-BR')}</span>
+            <span className="text-xs font-mono text-gray-400 uppercase font-bold">Gerado em: {new Date().toLocaleDateString('pt-BR')}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* LADO ESQUERDO: VISUALIZAÇÃO DOS INDICADORES */}
-        <div className="space-y-6">
-            <div>
-                <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold mb-2">Status Geral</h3>
-                <div className="bg-white p-4 rounded-xl border border-gray-200 flex items-center justify-between shadow-sm">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-brand-50 rounded-lg text-brand-600">
-                            <Radio size={24} />
+        <div className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                    <h3 className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-4">Status Geral de Locações</h3>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-brand-50 rounded-xl text-brand-600">
+                                <Radio size={28} />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-bold">Em Uso</p>
+                                <p className="text-3xl font-black text-gray-900">{activeRentals.length}</p>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-xs text-gray-500 uppercase font-bold">Em Uso (Ativo)</p>
-                            <p className="text-2xl font-bold text-gray-900">{activeRadiosInEvent}</p>
+                        <div className="text-right">
+                            <p className="text-xs text-gray-500 uppercase font-bold">Devolvidos</p>
+                            <p className="text-2xl font-black text-gray-300">{completedRentals.length}</p>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <p className="text-xs text-gray-500 uppercase font-bold">Devolvidos</p>
-                        <p className="text-xl font-bold text-gray-400">{completedRentals.length}</p>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                    <h3 className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-3">Inventário Disponível</h3>
+                    <div className="space-y-2 max-h-[100px] overflow-y-auto custom-scrollbar pr-2">
+                        {Object.entries(inventoryByType).map(([cat, stats]) => (
+                            <div key={cat} className="flex justify-between items-center text-sm border-b border-gray-50 pb-1 last:border-0">
+                                <span className="text-gray-600 font-bold">{cat}s</span>
+                                <span className="font-mono text-brand-600 font-black">{stats.total - stats.inUse} na base</span>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
 
-            {/* Nova Seção: Detalhamento por Setor na UI */}
+            {/* DETALHAMENTO POR SETOR NA UI */}
             <div>
-                <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold mb-2">Detalhamento por Setor</h3>
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <h3 className="text-xs uppercase tracking-widest text-gray-500 font-black mb-3 flex items-center gap-2">
+                    <Users size={16} /> Detalhamento por Setor
+                </h3>
+                <div className="grid grid-cols-1 gap-4">
                     {sortedSectorsForUI.length > 0 ? (
-                        <div className="divide-y divide-gray-100">
-                            {sortedSectorsForUI.map(([sectorName, count]) => (
-                                <div key={sectorName} className="p-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                        sortedSectorsForUI.map(([sectorName, data]) => (
+                            <div key={sectorName} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:border-brand-300 transition-all">
+                                <div className="p-4 bg-gray-50/50 flex items-center justify-between border-b border-gray-100">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                                            <Users size={14} />
+                                        <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-brand-600 shadow-sm">
+                                            <Package size={20} />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-bold text-gray-900">{sectorName}</p>
-                                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">
-                                                Coord: {getCoordinatorName(sectorName)}
-                                            </p>
+                                            <p className="text-lg font-black text-gray-900 tracking-tighter">{sectorName}</p>
+                                            <p className="text-[10px] text-gray-500 uppercase font-bold">Coord: {getCoordinatorName(sectorName)}</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <span className="bg-brand-50 text-brand-700 text-xs font-bold px-2 py-1 rounded">
-                                            {count} un.
-                                        </span>
+                                        <div className="flex flex-wrap gap-1 justify-end">
+                                            {Object.entries(data.counts).map(([cat, qty]) => (
+                                                <span key={cat} className="bg-brand-500 text-white text-[10px] font-black px-2 py-1 rounded-md uppercase">
+                                                    {qty} {cat}
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                                <div className="p-4">
+                                    <p className="text-[10px] uppercase font-bold text-gray-400 mb-2 tracking-widest">Equipamentos Vinculados</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {data.rentals.map(r => (
+                                            <div key={r.id} className="group relative bg-white border border-gray-200 px-3 py-2 rounded-lg flex flex-col hover:border-brand-500 transition-colors">
+                                                <span className="text-xs font-black text-gray-800 font-mono">{r.serialNumber}</span>
+                                                <span className="text-[9px] text-gray-400 font-bold uppercase truncate max-w-[100px]">{r.radioModel}</span>
+                                                {/* Tooltip de status */}
+                                                {r.status === RentalStatus.OVERDUE && (
+                                                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
                     ) : (
-                        <div className="p-4 text-center text-gray-500 text-sm">
-                            Nenhuma movimentação registrada.
+                        <div className="p-12 text-center bg-white border border-gray-200 rounded-2xl text-gray-400 italic font-medium">
+                            Nenhuma movimentação registrada no evento atual.
                         </div>
                     )}
                 </div>
             </div>
             
-            {partialRentals.length > 0 && (
-                 <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 mt-4">
-                     <div className="flex items-center gap-2 text-orange-600 mb-2">
-                        <AlertCircle size={20} />
-                        <span className="font-bold">Devoluções Parciais</span>
-                     </div>
-                     <p className="text-sm text-orange-800 mb-2">
-                         Existem <strong>{partialRentals.length}</strong> locações com itens faltantes.
-                     </p>
-                     <div className="text-xs text-orange-700 space-y-1 pl-1">
-                        {partialRentals.slice(0, 3).map(r => (
-                            <div key={r.id}>• {r.clientName} (Falta: {getMissingItemsList(r)})</div>
-                        ))}
-                        {partialRentals.length > 3 && <div>... e mais {partialRentals.length - 3}</div>}
-                     </div>
+            {/* PENDÊNCIAS E ATRASOS */}
+            {(partialRentals.length > 0 || overdueRentals.length > 0) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {partialRentals.length > 0 && (
+                         <div className="bg-orange-50 p-5 rounded-2xl border border-orange-200">
+                             <div className="flex items-center gap-2 text-orange-600 mb-3">
+                                <AlertCircle size={20} />
+                                <span className="font-black uppercase text-xs tracking-wider">Pendências Parciais</span>
+                             </div>
+                             <div className="space-y-3">
+                                {partialRentals.map(r => (
+                                    <div key={r.id} className="text-xs bg-white/50 p-2 rounded-lg border border-orange-100">
+                                        <div className="font-black text-orange-900">{r.clientName} ({r.clientCompany})</div>
+                                        <div className="text-orange-700 mt-1">Falta: <span className="font-bold">{getMissingItemsList(r)}</span></div>
+                                    </div>
+                                ))}
+                             </div>
+                        </div>
+                    )}
+
+                    {overdueRentals.length > 0 && (
+                        <div className="bg-red-50 p-5 rounded-2xl border border-red-200">
+                             <div className="flex items-center gap-2 text-red-600 mb-3">
+                                <AlertTriangle size={20} />
+                                <span className="font-black uppercase text-xs tracking-wider">Equipamentos Atrasados</span>
+                             </div>
+                             <div className="space-y-3">
+                                {overdueRentals.map(r => (
+                                    <div key={r.id} className="text-xs bg-white/50 p-2 rounded-lg border border-red-100">
+                                        <div className="font-black text-red-900">{r.clientName} ({r.clientCompany})</div>
+                                        <div className="text-red-700 mt-1 font-mono">ID: {r.serialNumber}</div>
+                                    </div>
+                                ))}
+                             </div>
+                        </div>
+                    )}
                 </div>
             )}
-
-            {overdueRentals.length > 0 ? (
-                <div className="bg-red-50 p-4 rounded-xl border border-red-200 mt-4">
-                     <div className="flex items-center gap-2 text-red-600 mb-2">
-                        <AlertTriangle size={20} />
-                        <span className="font-bold">Atenção Necessária</span>
-                     </div>
-                     <p className="text-sm text-red-800">
-                         Existem <strong>{overdueRentals.length}</strong> equipamentos com devolução atrasada.
-                     </p>
-                </div>
-            ) : null}
         </div>
 
-        {/* LADO DIREITO: PREVIEW E AÇÃO */}
+        {/* LADO DIREITO: PREVIEW WHATSAPP */}
         <div className="flex flex-col h-full">
-            <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold mb-2">Prévia da Mensagem (WhatsApp)</h3>
+            <h3 className="text-xs uppercase tracking-widest text-gray-500 font-black mb-3">Prévia da Mensagem (WhatsApp)</h3>
             
-            <div className="flex-1 bg-gray-100 rounded-xl border border-gray-200 p-4 relative overflow-hidden flex flex-col shadow-inner">
+            <div className="flex-1 bg-white rounded-3xl border border-gray-200 p-6 flex flex-col shadow-lg shadow-gray-200/50">
                  
-                 <div className="bg-white p-4 rounded-lg rounded-tl-none text-gray-800 text-sm font-mono whitespace-pre-line shadow-sm border border-gray-200 relative z-10 overflow-y-auto max-h-[500px] custom-scrollbar">
+                 <div className="bg-[#E7F3EF] p-5 rounded-2xl rounded-tl-none text-gray-800 text-sm font-mono whitespace-pre-line shadow-sm border border-emerald-100 relative z-10 overflow-y-auto max-h-[600px] custom-scrollbar flex-1 mb-6">
                     {generateMessage()}
                  </div>
 
-                 <div className="mt-4 pt-4 border-t border-gray-200 relative z-10">
+                 <div className="shrink-0">
                      <button
                         onClick={handleCopy}
-                        className={`w-full py-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-300 ${
+                        className={`w-full py-5 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 transition-all duration-300 ${
                             copied 
-                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-[1.02]' 
-                            : 'bg-[#25D366] hover:bg-[#20bd5a] text-white shadow-lg shadow-[#25D366]/30'
+                            ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-500/30 scale-[1.02]' 
+                            : 'bg-[#25D366] hover:bg-[#20bd5a] text-white shadow-xl shadow-[#25D366]/30 active:scale-95'
                         }`}
                      >
                         {copied ? (
                             <>
-                                <Check size={20} />
-                                Copiado!
+                                <Check size={20} strokeWidth={3} />
+                                Relatório Copiado!
                             </>
                         ) : (
                             <>
-                                <MessageCircle size={20} />
+                                <MessageCircle size={20} fill="currentColor" />
                                 Copiar para WhatsApp
                             </>
                         )}
