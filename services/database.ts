@@ -95,7 +95,13 @@ const mapLegendario = (l: any): Legendario => ({
 export const api = {
   // MANUTENÇÃO / LIMPEZA
   resetAllRentals: async () => {
+    // Apaga todas as locações. neq('id', 'uuid-invalido') é um hack para apagar tudo no Supabase sem erro de filtro
     const { error } = await supabase.from('rentals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw error;
+  },
+  resetAllDeliveries: async () => {
+    // Apaga todas as entregas de pins/patches
+    const { error } = await supabase.from('deliveries').delete().neq('id', 0);
     if (error) throw error;
   },
 
