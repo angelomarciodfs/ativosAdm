@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { Rental, Equipment, Sector } from '../types';
-import { Save, X, Phone, Plug, Battery, Headphones, Signal, Paperclip, Search, CheckSquare, Square } from 'lucide-react';
+import { Save, X, Phone, Plug, Battery, Headphones, Signal, Paperclip, Search, CheckSquare, Square, Printer, CheckCircle2 } from 'lucide-react';
+import { SYSTEM_LOGO } from '../constants';
 
 interface RentalFormProps {
   onCancel: () => void;
@@ -19,13 +21,15 @@ export const RentalForm: React.FC<RentalFormProps> = ({ onCancel, onSubmit, avai
     clientName: '',
     clientPhone: '',
     clientCompany: '',
-    selectedEquipmentIds: [] as string[], // Changed to array for multiple selection
+    selectedEquipmentIds: [] as string[],
     startDate: todayString,
     expectedReturnDate: '',
     notes: ''
   });
 
   const [equipmentSearch, setEquipmentSearch] = useState('');
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
+  const [createdRentals, setCreatedRentals] = useState<any[]>([]);
 
   const [accessories, setAccessories] = useState({
     charger: false,
@@ -35,7 +39,6 @@ export const RentalForm: React.FC<RentalFormProps> = ({ onCancel, onSubmit, avai
     clip: true
   });
 
-  // Toggle selection for multiple equipment
   const toggleEquipmentSelection = (eqId: string) => {
     setFormData(prev => {
       const currentIds = prev.selectedEquipmentIds;
@@ -54,11 +57,11 @@ export const RentalForm: React.FC<RentalFormProps> = ({ onCancel, onSubmit, avai
         return;
     }
     
-    // Iterate over all selected IDs and submit individual rentals
+    const newRentals: any[] = [];
     formData.selectedEquipmentIds.forEach(eqId => {
         const eq = availableEquipment.find(item => item.id === eqId);
         if (eq) {
-            onSubmit({
+            const rentalData = {
               eventId: activeEventId,
               clientName: formData.clientName,
               clientPhone: formData.clientPhone,
@@ -69,21 +72,104 @@ export const RentalForm: React.FC<RentalFormProps> = ({ onCancel, onSubmit, avai
               expectedReturnDate: formData.expectedReturnDate,
               notes: formData.notes,
               accessories: accessories
-            });
+            };
+            onSubmit(rentalData);
+            newRentals.push({ ...rentalData, id: `NEW-${Math.random().toString(36).substr(2, 5).toUpperCase()}` });
         }
     });
+
+    setCreatedRentals(newRentals);
+    setShowReceiptPreview(true);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   const toggleAccessory = (key: keyof typeof accessories) => {
     setAccessories(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Filter available equipment for the list
   const filteredEquipment = availableEquipment.filter(eq => 
     eq.name.toLowerCase().includes(equipmentSearch.toLowerCase()) ||
     eq.inventoryNumber.toLowerCase().includes(equipmentSearch.toLowerCase()) ||
     eq.model.toLowerCase().includes(equipmentSearch.toLowerCase())
   );
+
+  if (showReceiptPreview) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-8 max-w-lg mx-auto shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+        <div className="text-center mb-6 no-print">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 size={32} />
+            </div>
+            <h2 className="text-2xl font-black text-gray-900">Locação Registrada!</h2>
+            <p className="text-gray-500 text-sm mt-1">Deseja imprimir o recibo de saída agora?</p>
+        </div>
+
+        {/* AREA DE IMPRESSÃO (Formatada para 58mm) */}
+        <div id="receipt-print-area" className="border-t border-b border-gray-100 py-4 my-6 bg-gray-50 p-4 font-mono text-xs text-black">
+            <div className="text-center mb-2">
+                <img src={SYSTEM_LOGO} alt="Logo" className="h-8 mx-auto mb-2 grayscale" />
+                <p className="font-bold text-sm uppercase">Comprovante de Locação</p>
+                <p>--------------------------------</p>
+            </div>
+            
+            <div className="space-y-1 mb-4">
+                <p><strong>RESPONSAVEL:</strong> {formData.clientName}</p>
+                <p><strong>SETOR:</strong> {formData.clientCompany}</p>
+                <p><strong>SAIDA:</strong> {new Date(formData.startDate).toLocaleDateString('pt-BR')}</p>
+                <p><strong>PREV. VOLTA:</strong> {new Date(formData.expectedReturnDate).toLocaleDateString('pt-BR')}</p>
+            </div>
+
+            <p className="font-bold mb-1">EQUIPAMENTOS:</p>
+            <div className="border-b border-dashed border-gray-300 pb-2 mb-2">
+                {createdRentals.map((r, i) => (
+                    <div key={i} className="mb-1">
+                        <p>• {r.radioModel}</p>
+                        <p className="pl-3 text-[10px]">Patrimônio: {r.serialNumber}</p>
+                    </div>
+                ))}
+            </div>
+
+            <p className="font-bold mb-1">ACESSORIOS INCLUSOS:</p>
+            <div className="grid grid-cols-2 gap-x-2 text-[10px] mb-6">
+                {accessories.antenna && <p>[X] ANTENA</p>}
+                {accessories.clip && <p>[X] CLIP</p>}
+                {accessories.charger && <p>[X] CARREGADOR</p>}
+                {accessories.headset && <p>[X] FONE</p>}
+                {accessories.powerBank && <p>[X] P. BANK</p>}
+            </div>
+
+            <div className="mt-8 pt-8 border-t border-dashed border-gray-400 text-center">
+                <p>________________________________</p>
+                <p className="mt-1 font-bold uppercase">{formData.clientName}</p>
+                <p className="text-[9px]">Assinatura do Requerente</p>
+            </div>
+
+            <div className="mt-6 text-[8px] text-center italic">
+                <p>Declaro ter recebido os equipamentos acima em perfeito estado de funcionamento.</p>
+                <p className="mt-2">RadioTrack - Gestão Rota da Luz</p>
+            </div>
+        </div>
+
+        <div className="flex flex-col gap-3 no-print">
+            <button 
+                onClick={handlePrint}
+                className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all shadow-lg active:scale-95"
+            >
+                <Printer size={20} /> Imprimir Recibo
+            </button>
+            <button 
+                onClick={onCancel}
+                className="w-full py-4 bg-brand-500 text-white rounded-xl font-bold hover:bg-brand-600 transition-all shadow-lg active:scale-95"
+            >
+                Concluir e Voltar
+            </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 md:p-8 max-w-3xl mx-auto shadow-xl animate-in zoom-in-95 duration-200">
@@ -191,7 +277,6 @@ export const RentalForm: React.FC<RentalFormProps> = ({ onCancel, onSubmit, avai
                     )}
                 </div>
             </div>
-            <p className="text-[10px] text-gray-400">Clique nos itens para selecionar. Você pode marcar múltiplos equipamentos para o mesmo responsável.</p>
           </div>
 
           {/* ACCESSORIES CHECKLIST */}

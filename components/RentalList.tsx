@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { Rental, RentalStatus, RentalAccessories } from '../types';
-import { CheckCircle, AlertCircle, Clock, Search, RotateCcw, User, Phone, X, CheckSquare, Square, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, Search, RotateCcw, User, Phone, X, CheckSquare, Square, AlertTriangle, Printer } from 'lucide-react';
+import { SYSTEM_LOGO } from '../constants';
 
 interface RentalListProps {
   rentals: Rental[];
@@ -11,6 +13,8 @@ interface RentalListProps {
 export const RentalList: React.FC<RentalListProps> = ({ rentals, onReturn, filter }) => {
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
+  const [showReprintModal, setShowReprintModal] = useState(false);
+  
   const [checklist, setChecklist] = useState<RentalAccessories>({
     charger: false,
     powerBank: false,
@@ -30,7 +34,7 @@ export const RentalList: React.FC<RentalListProps> = ({ rentals, onReturn, filte
     switch (status) {
       case RentalStatus.ACTIVE: return 'bg-blue-50 text-blue-700 border-blue-200';
       case RentalStatus.OVERDUE: return 'bg-red-50 text-red-700 border-red-200';
-      case RentalStatus.PARTIAL: return 'bg-orange-50 text-orange-700 border-orange-200'; // Amber/Orange style for partial
+      case RentalStatus.PARTIAL: return 'bg-orange-50 text-orange-700 border-orange-200';
       case RentalStatus.COMPLETED: return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       default: return 'bg-gray-100 text-gray-600 border-gray-200';
     }
@@ -60,7 +64,6 @@ export const RentalList: React.FC<RentalListProps> = ({ rentals, onReturn, filte
 
   const handleOpenReturnModal = (rental: Rental) => {
     setSelectedRental(rental);
-    // Initialize checklist based on previously returned items (if any)
     setChecklist(rental.returnedAccessories || {
         charger: false,
         powerBank: false,
@@ -69,6 +72,11 @@ export const RentalList: React.FC<RentalListProps> = ({ rentals, onReturn, filte
         clip: false
     });
     setReturnModalOpen(true);
+  };
+
+  const handleOpenReprintModal = (rental: Rental) => {
+    setSelectedRental(rental);
+    setShowReprintModal(true);
   };
 
   const toggleChecklistItem = (key: keyof RentalAccessories) => {
@@ -140,7 +148,7 @@ export const RentalList: React.FC<RentalListProps> = ({ rentals, onReturn, filte
               filteredRentals.map((rental) => (
                 <tr key={rental.id} className="hover:bg-gray-50 transition-colors group">
                   <td className="p-4">
-                    <div className="font-mono text-brand-600 font-bold text-sm">{rental.id.split('-').slice(1).join('-')}</div>
+                    <div className="font-mono text-brand-600 font-black text-sm">{rental.id.split('-').slice(1).join('-')}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{rental.serialNumber}</div>
                   </td>
                   <td className="p-4">
@@ -170,13 +178,22 @@ export const RentalList: React.FC<RentalListProps> = ({ rentals, onReturn, filte
                   </td>
                   {filter === 'active' && (
                     <td className="p-4 text-right">
-                        <button 
-                            onClick={() => handleOpenReturnModal(rental)}
-                            className="bg-white hover:bg-brand-500 hover:text-white text-gray-700 px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-2 ml-auto border border-gray-200 hover:border-brand-500 shadow-sm"
-                        >
-                            <RotateCcw size={14} />
-                            {rental.status === RentalStatus.PARTIAL ? 'Continuar' : 'Baixar'}
-                        </button>
+                        <div className="flex items-center gap-2 justify-end">
+                            <button 
+                                onClick={() => handleOpenReprintModal(rental)}
+                                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="Reimprimir Recibo"
+                            >
+                                <Printer size={18} />
+                            </button>
+                            <button 
+                                onClick={() => handleOpenReturnModal(rental)}
+                                className="bg-white hover:bg-brand-500 hover:text-white text-gray-700 px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-2 border border-gray-200 hover:border-brand-500 shadow-sm"
+                            >
+                                <RotateCcw size={14} />
+                                {rental.status === RentalStatus.PARTIAL ? 'Continuar' : 'Baixar'}
+                            </button>
+                        </div>
                     </td>
                   )}
                 </tr>
@@ -186,6 +203,60 @@ export const RentalList: React.FC<RentalListProps> = ({ rentals, onReturn, filte
         </table>
       </div>
     </div>
+
+    {/* REPRINT MODAL */}
+    {showReprintModal && selectedRental && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 animate-in zoom-in-95 duration-200 relative">
+                <button onClick={() => setShowReprintModal(false)} className="absolute right-4 top-4 text-gray-400 hover:text-gray-700 no-print">
+                    <X size={24} />
+                </button>
+                <div className="text-center mb-6 no-print">
+                    <Printer size={32} className="mx-auto text-gray-400 mb-2" />
+                    <h3 className="text-xl font-bold">Reimpressão de Recibo</h3>
+                </div>
+
+                <div id="receipt-print-area" className="bg-gray-50 p-4 font-mono text-xs text-black mb-6">
+                    <div className="text-center mb-2">
+                        <img src={SYSTEM_LOGO} alt="Logo" className="h-8 mx-auto mb-2 grayscale" />
+                        <p className="font-bold text-sm uppercase">Reimpressão de Recibo</p>
+                        <p>--------------------------------</p>
+                    </div>
+                    <div className="space-y-1 mb-4">
+                        <p><strong>LOCAÇÃO:</strong> {selectedRental.id.split('-').pop()}</p>
+                        <p><strong>RESP:</strong> {selectedRental.clientName}</p>
+                        <p><strong>SETOR:</strong> {selectedRental.clientCompany}</p>
+                        <p><strong>SAIDA:</strong> {formatDate(selectedRental.startDate)}</p>
+                    </div>
+                    <div className="border-b border-dashed border-gray-300 pb-2 mb-2">
+                        <p><strong>EQUIPAMENTO:</strong></p>
+                        <p>• {selectedRental.radioModel}</p>
+                        <p className="pl-3 text-[10px]">Patrimônio: {selectedRental.serialNumber}</p>
+                    </div>
+                    <div className="mt-8 pt-8 border-t border-dashed border-gray-400 text-center">
+                        <p>________________________________</p>
+                        <p className="mt-1 font-bold uppercase">{selectedRental.clientName}</p>
+                        <p className="text-[9px]">Assinatura do Requerente</p>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-3 no-print">
+                    <button 
+                        onClick={() => window.print()}
+                        className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all shadow-lg"
+                    >
+                        <Printer size={20} /> Confirmar Impressão
+                    </button>
+                    <button 
+                        onClick={() => setShowReprintModal(false)}
+                        className="w-full py-4 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-50 transition-all"
+                    >
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    )}
 
     {/* RETURN MODAL */}
     {returnModalOpen && selectedRental && (

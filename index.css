@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
@@ -44,4 +45,36 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb {
     background-color: #e5e7eb;
     border-radius: 20px;
+}
+
+/* --- ESTILOS DE IMPRESSÃO PARA RECIBO TÉRMICO 58MM --- */
+@media print {
+  @page {
+    margin: 0;
+    size: 58mm auto;
+  }
+  
+  body * {
+    visibility: hidden;
+  }
+  
+  #receipt-print-area, #receipt-print-area * {
+    visibility: visible;
+  }
+  
+  #receipt-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58mm;
+    padding: 2mm;
+    background: white;
+    color: black;
+    font-family: 'Courier New', Courier, monospace; /* Fontes mono costumam imprimir melhor em térmicas */
+    font-size: 10pt;
+  }
+
+  .no-print {
+    display: none !important;
+  }
 }
