@@ -213,20 +213,22 @@ export const RentalList: React.FC<RentalListProps> = ({ rentals, onReturn, filte
                 </button>
                 <div className="text-center mb-6 no-print">
                     <Printer size={32} className="mx-auto text-gray-400 mb-2" />
-                    <h3 className="text-xl font-bold">Reimpressão de Recibo</h3>
+                    <h3 className="text-xl font-bold">Reimprimir Recibo</h3>
                 </div>
 
                 <div id="receipt-print-area" className="bg-gray-50 p-4 font-mono text-xs text-black mb-6">
                     <div className="text-center mb-2">
                         <img src={SYSTEM_LOGO} alt="Logo" className="h-8 mx-auto mb-2 grayscale" />
-                        <p className="font-bold text-sm uppercase">Reimpressão de Recibo</p>
+                        <p className="font-bold text-sm uppercase">RECIBO DE ENTREGA</p>
                         <p>--------------------------------</p>
                     </div>
                     <div className="space-y-1 mb-4">
                         <p><strong>LOCAÇÃO:</strong> {selectedRental.id.split('-').pop()}</p>
                         <p><strong>RESP:</strong> {selectedRental.clientName}</p>
+                        <p><strong>FONE:</strong> {selectedRental.clientPhone}</p>
                         <p><strong>SETOR:</strong> {selectedRental.clientCompany}</p>
                         <p><strong>SAIDA:</strong> {formatDate(selectedRental.startDate)}</p>
+                        <p><strong>VOLTA:</strong> {formatDate(selectedRental.expectedReturnDate)}</p>
                     </div>
                     <div className="border-b border-dashed border-gray-300 pb-2 mb-2">
                         <p><strong>EQUIPAMENTO:</strong></p>

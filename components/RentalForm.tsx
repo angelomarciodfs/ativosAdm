@@ -96,6 +96,12 @@ export const RentalForm: React.FC<RentalFormProps> = ({ onCancel, onSubmit, avai
     eq.model.toLowerCase().includes(equipmentSearch.toLowerCase())
   );
 
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
   if (showReceiptPreview) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-8 max-w-lg mx-auto shadow-2xl animate-in fade-in zoom-in-95 duration-300">
@@ -104,22 +110,23 @@ export const RentalForm: React.FC<RentalFormProps> = ({ onCancel, onSubmit, avai
                 <CheckCircle2 size={32} />
             </div>
             <h2 className="text-2xl font-black text-gray-900">Locação Registrada!</h2>
-            <p className="text-gray-500 text-sm mt-1">Deseja imprimir o recibo de saída agora?</p>
+            <p className="text-gray-500 text-sm mt-1">Imprima o recibo antes de sair desta tela.</p>
         </div>
 
         {/* AREA DE IMPRESSÃO (Formatada para 58mm) */}
         <div id="receipt-print-area" className="border-t border-b border-gray-100 py-4 my-6 bg-gray-50 p-4 font-mono text-xs text-black">
             <div className="text-center mb-2">
                 <img src={SYSTEM_LOGO} alt="Logo" className="h-8 mx-auto mb-2 grayscale" />
-                <p className="font-bold text-sm uppercase">Comprovante de Locação</p>
+                <p className="font-bold text-sm uppercase">RECIBO DE ENTREGA</p>
                 <p>--------------------------------</p>
             </div>
             
             <div className="space-y-1 mb-4">
-                <p><strong>RESPONSAVEL:</strong> {formData.clientName}</p>
+                <p><strong>RESP:</strong> {formData.clientName}</p>
+                <p><strong>FONE:</strong> {formData.clientPhone}</p>
                 <p><strong>SETOR:</strong> {formData.clientCompany}</p>
-                <p><strong>SAIDA:</strong> {new Date(formData.startDate).toLocaleDateString('pt-BR')}</p>
-                <p><strong>PREV. VOLTA:</strong> {new Date(formData.expectedReturnDate).toLocaleDateString('pt-BR')}</p>
+                <p><strong>SAIDA:</strong> {formatDate(formData.startDate)}</p>
+                <p><strong>VOLTA:</strong> {formatDate(formData.expectedReturnDate)}</p>
             </div>
 
             <p className="font-bold mb-1">EQUIPAMENTOS:</p>
@@ -132,7 +139,7 @@ export const RentalForm: React.FC<RentalFormProps> = ({ onCancel, onSubmit, avai
                 ))}
             </div>
 
-            <p className="font-bold mb-1">ACESSORIOS INCLUSOS:</p>
+            <p className="font-bold mb-1">ACESSORIOS:</p>
             <div className="grid grid-cols-2 gap-x-2 text-[10px] mb-6">
                 {accessories.antenna && <p>[X] ANTENA</p>}
                 {accessories.clip && <p>[X] CLIP</p>}

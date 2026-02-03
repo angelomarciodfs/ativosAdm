@@ -237,7 +237,13 @@ const App: React.FC = () => {
 
   const handleCreateRental = async (data: Omit<Rental, 'id' | 'status'>) => {
     if (!currentUser) return;
-    try { const newRental = await api.createRental(data, currentUser.id); setRentals(prev => [newRental, ...prev]); setView('rentals'); } catch { alert("Erro ao salvar."); }
+    try { 
+        const newRental = await api.createRental(data, currentUser.id); 
+        setRentals(prev => [newRental, ...prev]); 
+        // Nota: setView('rentals') foi removido para permitir que o RentalForm controle a exibição do recibo.
+    } catch { 
+        alert("Erro ao salvar."); 
+    }
   };
 
   const handleReturn = async (id: string, returnedItems: RentalAccessories) => {
