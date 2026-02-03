@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Equipment, Sector, User, UserRole, Event, EquipmentItem, Channel, MerchandiseItem } from '../types';
-import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key, Radio as RadioIcon, Activity, Phone, Power, Check, X, Tag } from 'lucide-react';
+import { Plus, Search, Trash2, Save, Users, Package, Pencil, Shield, Calendar, Clock, UserCheck, Key, Radio as RadioIcon, Activity, Phone, Power, Check, X, Tag, AlertTriangle, RefreshCw, Server } from 'lucide-react';
 import { api } from '../services/database';
 
 interface ConfigurationViewProps {
@@ -29,7 +29,7 @@ interface ConfigurationViewProps {
   onAddEvent: (event: Omit<Event, 'id'>) => void;
   onUpdateEvent: (event: Event) => void;
   onDeleteEvent: (id: string) => void;
-  activeTab: 'events' | 'inventory' | 'sectors' | 'users' | 'channels' | 'stock';
+  activeTab: 'events' | 'inventory' | 'sectors' | 'users' | 'channels' | 'stock' | 'system';
   setActiveTab: (tab: any) => void;
   inventorySubTab: 'ativos' | 'itens';
   setInventorySubTab: (tab: any) => void;
@@ -47,12 +47,11 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
   
-  // Stock State (Loaded internally since it's only used here for config)
   const [merchandiseList, setMerchandiseList] = useState<MerchandiseItem[]>([]);
   const [loadingStock, setLoadingStock] = useState(false);
 
-  // Form States
   const [eqFormData, setEqFormData] = useState({ inventoryNumber: '', brand: '', model: '', category: '' });
   const [itemFormData, setItemFormData] = useState({ name: '' });
   const [sectorFormData, setSectorFormData] = useState({ name: '', coordinatorName: '', coordinatorPhone: '', channelId: '' });
@@ -61,7 +60,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
   const [eventFormData, setEventFormData] = useState({ name: '', startDate: '', endDate: '', isActive: true });
   const [stockFormData, setStockFormData] = useState({ name: '', currentStock: 0, minThreshold: 10 });
 
-  // Load stock when tab is active
   React.useEffect(() => {
     if (activeTab === 'stock') {
       setLoadingStock(true);
@@ -97,6 +95,28 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     setEditingId(null);
   };
 
+  const handleResetRentals = async () => {
+      if (!confirm("⚠️ ATENÇÃO: Isso irá apagar PERMANENTEMENTE todas as locações registradas. O histórico de Pins e Patches NÃO será afetado. Deseja continuar?")) return;
+      
+      const confirmText = prompt("Para confirmar a limpeza de todas as locações, digite: DELETAR");
+      if (confirmText !== "DELETAR") {
+          alert("Operação cancelada.");
+          return;
+      }
+
+      setIsResetting(true);
+      try {
+          await api.resetAllRentals();
+          alert("Histórico de locações limpo com sucesso! O dashboard agora refletirá zero locações ativas.");
+          window.location.reload(); 
+      } catch (err) {
+          console.error(err);
+          alert("Erro ao limpar dados de locação.");
+      } finally {
+          setIsResetting(false);
+      }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (activeTab === 'inventory' && inventorySubTab === 'itens') {
@@ -125,7 +145,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
     } else if (activeTab === 'stock') {
         if (editingId) await api.updateMerchandise({ id: editingId, ...stockFormData });
         else await api.createMerchandise(stockFormData);
-        // Reload list
         api.fetchMerchandise().then(setMerchandiseList);
     }
     resetForms();
@@ -150,12 +169,6 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
       return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
-  const resolveCreatorName = (userIdOrName?: string) => {
-      if (!userIdOrName) return 'Sistema';
-      const user = userList.find(u => u.id === userIdOrName);
-      return user ? user.name : userIdOrName;
-  };
-
   const resolveChannelInfo = (channelId?: string) => {
       if (!channelId) return null;
       return channelList.find(c => c.id === channelId);
@@ -169,14 +182,16 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
           <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Configurações</h2>
           <p className="text-gray-500 mt-1 text-sm font-medium uppercase tracking-wider">Gestão centralizada do sistema.</p>
         </div>
-        <button 
-          onClick={() => { setIsAdding(!isAdding); if(isAdding) resetForms(); }}
-          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg w-full md:w-auto justify-center ${
-            isAdding ? 'bg-white text-red-600 border border-red-200 hover:bg-red-50' : 'bg-brand-500 text-white hover:bg-brand-600 shadow-brand-500/20'
-          }`}
-        >
-          {isAdding ? 'Cancelar' : <><Plus size={18} /> Novo Registro</>}
-        </button>
+        {activeTab !== 'system' && (
+            <button 
+                onClick={() => { setIsAdding(!isAdding); if(isAdding) resetForms(); }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg w-full md:w-auto justify-center ${
+                    isAdding ? 'bg-white text-red-600 border border-red-200 hover:bg-red-50' : 'bg-brand-500 text-white hover:bg-brand-600 shadow-brand-500/20'
+                }`}
+            >
+                {isAdding ? 'Cancelar' : <><Plus size={18} /> Novo Registro</>}
+            </button>
+        )}
       </div>
 
       {/* TABS NAVIGATION */}
@@ -187,7 +202,8 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
             { id: 'channels', label: 'Canais', icon: RadioIcon },
             { id: 'sectors', label: 'Setores', icon: Users },
             { id: 'users', label: 'Usuários', icon: Shield },
-            { id: 'stock', label: 'Estoque', icon: Tag }
+            { id: 'stock', label: 'Estoque', icon: Tag },
+            { id: 'system', label: 'Sistema', icon: Server }
         ].map(tab => (
             <button 
               key={tab.id} 
@@ -201,380 +217,139 @@ export const ConfigurationView: React.FC<ConfigurationViewProps> = ({
         ))}
       </div>
 
-      {activeTab === 'inventory' && (
-          <div className="flex gap-2 p-1.5 bg-gray-100 rounded-lg w-full md:w-fit shadow-inner">
-              <button 
-                onClick={() => { setInventorySubTab('ativos'); if(isAdding) resetForms(); }}
-                className={`flex-1 md:flex-none px-5 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'ativos' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                Ativos Físicos
-              </button>
-              <button 
-                onClick={() => { setInventorySubTab('itens'); if(isAdding) resetForms(); }}
-                className={`flex-1 md:flex-none px-5 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'itens' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                Categorias / Itens
-              </button>
+      {/* SYSTEM TAB - EXCLUSIVO PARA RESET DE LOCAÇÕES */}
+      {activeTab === 'system' && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm space-y-8 animate-in slide-in-from-top-4 duration-300">
+              <div className="flex flex-col md:flex-row items-start gap-6 border-l-4 border-red-500 bg-red-50 p-6 rounded-r-xl">
+                  <div className="bg-red-100 p-3 rounded-full text-red-600">
+                      <AlertTriangle size={32} />
+                  </div>
+                  <div className="flex-1">
+                      <h3 className="text-xl font-black text-red-900 uppercase">Zona de Perigo: Manutenção de Dados</h3>
+                      <p className="text-red-700 mt-1 font-medium">Esta função permite limpar os dados de teste para iniciar o evento. Somente o histórico de locações será removido.</p>
+                      
+                      <button 
+                        onClick={handleResetRentals}
+                        disabled={isResetting}
+                        className="mt-6 flex items-center gap-2 px-8 py-4 bg-red-600 text-white rounded-xl font-black uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-xl shadow-red-600/20 active:scale-95 disabled:opacity-50"
+                      >
+                          {isResetting ? <RefreshCw className="animate-spin" size={18} /> : <Trash2 size={18} />}
+                          Zerar Todas as Locações
+                      </button>
+                  </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-6 bg-gray-50 rounded-xl border border-gray-200">
+                      <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                          <Check size={16} className="text-emerald-500" /> O que SERÁ apagado:
+                      </h4>
+                      <ul className="text-sm text-gray-600 space-y-2">
+                          <li>• Todas as locações ativas e encerradas</li>
+                          <li>• Histórico de devoluções e pendências</li>
+                          <li>• Logs de sistema temporários</li>
+                      </ul>
+                  </div>
+                  <div className="p-6 bg-gray-50 rounded-xl border border-gray-200">
+                      <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                          <X size={16} className="text-red-500" /> O que NÃO será afetado:
+                      </h4>
+                      <ul className="text-sm text-gray-600 space-y-2">
+                          <li>• <strong>Pins e Patches</strong> (Cadastro e Entregas)</li>
+                          <li>• Cadastro de Rádios e Patrimônios</li>
+                          <li>• Usuários, Senhas e Setores</li>
+                          <li>• Estoque de materiais</li>
+                      </ul>
+                  </div>
+              </div>
           </div>
       )}
 
-      {/* FORMS SECTION */}
-      {isAdding && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-2xl animate-in slide-in-from-top-4 duration-300">
-            <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-100 pb-3 uppercase tracking-tighter">
-                <Plus size={20} className="text-brand-500" /> 
-                {editingId ? 'Editar' : 'Novo'} {activeTab === 'inventory' ? (inventorySubTab === 'ativos' ? 'Ativo' : 'ITEM') : (activeTab === 'stock' ? 'Item de Estoque' : activeTab.slice(0, -1).toUpperCase())}
-            </h3>
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
-                
-                {/* FORMULÁRIO DE ESTOQUE (PINS & PATCHES) */}
-                {activeTab === 'stock' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="md:col-span-2 space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do Item</label>
-                            <input required type="text" placeholder="Ex: Pin Global, Patch ADM..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" value={stockFormData.name} onChange={e => setStockFormData({...stockFormData, name: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-brand-600 font-bold">Saldo Inicial</label>
-                            <input required type="number" min="0" className="w-full bg-gray-50 border border-brand-200 rounded-lg p-3 font-mono font-bold text-brand-600" value={stockFormData.currentStock} onChange={e => setStockFormData({...stockFormData, currentStock: parseInt(e.target.value) || 0})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-400 font-bold">Estoque Mínimo (Alerta)</label>
-                            <input required type="number" min="0" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={stockFormData.minThreshold} onChange={e => setStockFormData({...stockFormData, minThreshold: parseInt(e.target.value) || 0})} />
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'channels' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do Canal</label>
-                            <input required type="text" placeholder="Ex: TOP-01" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono" value={channelFormData.name} onChange={e => setChannelFormData({...channelFormData, name: maskChannel(e.target.value)})} maxLength={6} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Frequência</label>
-                            <input required type="text" placeholder="Ex: 144.925" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono" value={channelFormData.frequency} onChange={e => setChannelFormData({...channelFormData, frequency: maskFrequency(e.target.value)})} maxLength={7} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Tipo</label>
-                            <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={channelFormData.type} onChange={e => setChannelFormData({...channelFormData, type: e.target.value})}>
-                                <option value="VHF">VHF</option>
-                                <option value="UHF">UHF</option>
-                            </select>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'sectors' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Sigla do Setor</label>
-                            <input required type="text" placeholder="Ex: ADM" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold uppercase" value={sectorFormData.name} onChange={e => setSectorFormData({...sectorFormData, name: e.target.value.toUpperCase()})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Canal Operacional</label>
-                            <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.channelId} onChange={e => setSectorFormData({...sectorFormData, channelId: e.target.value})}>
-                                <option value="">Sem Canal Definido</option>
-                                {channelList.map(ch => <option key={ch.id} value={ch.id}>{ch.name} - {ch.frequency} ({ch.type})</option>)}
-                            </select>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Coordenador</label>
-                            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.coordinatorName} onChange={e => setSectorFormData({...sectorFormData, coordinatorName: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">WhatsApp</label>
-                            <input type="tel" placeholder="(00) 00000-0000" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.coordinatorPhone} onChange={e => setSectorFormData({...sectorFormData, coordinatorPhone: e.target.value})} />
-                        </div>
-                    </div>
-                )}
-                
-                {activeTab === 'events' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2 space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Nome do Evento</label>
-                            <input required type="text" placeholder="Ex: TOP 1109 - Ed. 55" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eventFormData.name} onChange={e => setEventFormData({...eventFormData, name: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Data Início</label>
-                            <input required type="date" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eventFormData.startDate} onChange={e => setEventFormData({...eventFormData, startDate: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Data Fim</label>
-                            <input required type="date" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eventFormData.endDate} onChange={e => setEventFormData({...eventFormData, endDate: e.target.value})} />
-                        </div>
-                        <div className="flex items-center gap-2 py-2">
-                            <input type="checkbox" id="isActive" checked={eventFormData.isActive} onChange={e => setEventFormData({...eventFormData, isActive: e.target.checked})} className="w-5 h-5 accent-brand-500 rounded" />
-                            <label htmlFor="isActive" className="text-sm font-bold text-gray-700">Evento Ativo Atualmente</label>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold flex justify-between items-center mb-1">
-                                CATEGORIA
-                                <button type="button" onClick={() => { setInventorySubTab('itens'); setIsAdding(true); setEditingId(null); }} className="text-brand-600 hover:text-brand-700 text-[9px] font-black border border-brand-200 px-1.5 rounded bg-brand-50 uppercase">NOVO ITEM +</button>
-                            </label>
-                            <select required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.category} onChange={e => setEqFormData({...eqFormData, category: e.target.value})}>
-                                <option value="">Selecione...</option>
-                                {itemList.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-brand-600 font-bold">Patrimônio / ID</label>
-                            <input required type="text" placeholder="Ex: R-01" className="w-full bg-gray-50 border border-brand-200 rounded-lg p-3 font-mono font-bold" value={eqFormData.inventoryNumber} onChange={e => setEqFormData({...eqFormData, inventoryNumber: e.target.value.toUpperCase()})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Marca</label>
-                            <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.brand} onChange={e => setEqFormData({...eqFormData, brand: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Modelo</label>
-                            <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.model} onChange={e => setEqFormData({...eqFormData, model: e.target.value})} />
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'inventory' && inventorySubTab === 'itens' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Nome da Categoria (Ex: Lanterna, Rádio)</label>
-                            <input required type="text" placeholder="Digite o nome..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" value={itemFormData.name} onChange={e => setItemFormData({name: e.target.value})} />
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'users' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Nome Completo</label>
-                            <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.name} onChange={e => setUserFormData({...userFormData, name: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Email</label>
-                            <input required type="email" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.email} onChange={e => setUserFormData({...userFormData, email: e.target.value})} disabled={!!editingId} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">{editingId ? 'Nova Senha (vazio para não alterar)' : 'Senha Inicial'}</label>
-                            <div className="relative">
-                                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                                <input 
-                                    type="password" 
-                                    placeholder="Mínimo 6 caracteres" 
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 pl-10" 
-                                    value={userFormData.password} 
-                                    onChange={e => setUserFormData({...userFormData, password: e.target.value})} 
-                                    required={!editingId}
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs uppercase text-gray-500 font-bold">Perfil de Acesso</label>
-                            <select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.role} onChange={e => setUserFormData({...userFormData, role: e.target.value as UserRole})}>
-                                <option value="USER">Operador (Locações)</option>
-                                <option value="ADMIN">Administrador (Total)</option>
-                            </select>
-                        </div>
-                    </div>
-                )}
-
-                <div className="flex gap-4 pt-4 border-t border-gray-100">
-                    <button type="button" onClick={resetForms} className="flex-1 py-4 border border-gray-200 text-gray-600 font-black rounded-xl hover:bg-gray-50 transition-colors uppercase text-[10px] tracking-widest">Descartar</button>
-                    <button type="submit" className="flex-1 py-4 bg-brand-500 text-white font-black rounded-xl hover:bg-brand-600 shadow-xl shadow-brand-500/30 flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest">
-                        <Save size={18} /> Salvar Registro
-                    </button>
+      {/* RENDERIZAÇÃO DOS FORMULÁRIOS E LISTAS (SE NÃO FOR TAB DE SISTEMA) */}
+      {activeTab !== 'system' && (
+          <>
+            {activeTab === 'inventory' && (
+                <div className="flex gap-2 p-1.5 bg-gray-100 rounded-lg w-full md:w-fit shadow-inner">
+                    <button onClick={() => { setInventorySubTab('ativos'); if(isAdding) resetForms(); }} className={`flex-1 md:flex-none px-5 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'ativos' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Ativos Físicos</button>
+                    <button onClick={() => { setInventorySubTab('itens'); if(isAdding) resetForms(); }} className={`flex-1 md:flex-none px-5 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'itens' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Categorias / Itens</button>
                 </div>
-            </form>
-          </div>
+            )}
+
+            {isAdding && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-2xl animate-in slide-in-from-top-4 duration-300">
+                    <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-100 pb-3 uppercase tracking-tighter">
+                        <Plus size={20} className="text-brand-500" /> 
+                        {editingId ? 'Editar' : 'Novo'} {activeTab === 'inventory' ? (inventorySubTab === 'ativos' ? 'Ativo' : 'ITEM') : (activeTab === 'stock' ? 'Item de Estoque' : activeTab.slice(0, -1).toUpperCase())}
+                    </h3>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {activeTab === 'stock' && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="md:col-span-2 space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Nome do Item</label><input required type="text" placeholder="Ex: Pin Global, Patch ADM..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" value={stockFormData.name} onChange={e => setStockFormData({...stockFormData, name: e.target.value})} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-brand-600 font-bold">Saldo Inicial</label><input required type="number" min="0" className="w-full bg-gray-50 border border-brand-200 rounded-lg p-3 font-mono font-bold text-brand-600" value={stockFormData.currentStock} onChange={e => setStockFormData({...stockFormData, currentStock: parseInt(e.target.value) || 0})} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-400 font-bold">Estoque Mínimo (Alerta)</label><input required type="number" min="0" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={stockFormData.minThreshold} onChange={e => setStockFormData({...stockFormData, minThreshold: parseInt(e.target.value) || 0})} /></div>
+                            </div>
+                        )}
+                        {activeTab === 'channels' && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Nome do Canal</label><input required type="text" placeholder="Ex: TOP-01" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono" value={channelFormData.name} onChange={e => setChannelFormData({...channelFormData, name: maskChannel(e.target.value)})} maxLength={6} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Frequência</label><input required type="text" placeholder="Ex: 144.925" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono" value={channelFormData.frequency} onChange={e => setChannelFormData({...channelFormData, frequency: maskFrequency(e.target.value)})} maxLength={7} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Tipo</label><select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={channelFormData.type} onChange={e => setChannelFormData({...channelFormData, type: e.target.value})}><option value="VHF">VHF</option><option value="UHF">UHF</option></select></div>
+                            </div>
+                        )}
+                        {activeTab === 'sectors' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Sigla do Setor</label><input required type="text" placeholder="Ex: ADM" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold uppercase" value={sectorFormData.name} onChange={e => setSectorFormData({...sectorFormData, name: e.target.value.toUpperCase()})} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Canal Operacional</label><select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.channelId} onChange={e => setSectorFormData({...sectorFormData, channelId: e.target.value})}><option value="">Sem Canal Definido</option>{channelList.map(ch => <option key={ch.id} value={ch.id}>{ch.name} - {ch.frequency} ({ch.type})</option>)}</select></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Coordenador</label><input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.coordinatorName} onChange={e => setSectorFormData({...sectorFormData, coordinatorName: e.target.value})} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">WhatsApp</label><input type="tel" placeholder="(00) 00000-0000" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={sectorFormData.coordinatorPhone} onChange={e => setSectorFormData({...sectorFormData, coordinatorPhone: e.target.value})} /></div>
+                            </div>
+                        )}
+                        {activeTab === 'events' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="md:col-span-2 space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Nome do Evento</label><input required type="text" placeholder="Ex: TOP 1109 - Ed. 55" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eventFormData.name} onChange={e => setEventFormData({...eventFormData, name: e.target.value})} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Data Início</label><input required type="date" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eventFormData.startDate} onChange={e => setEventFormData({...eventFormData, startDate: e.target.value})} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Data Fim</label><input required type="date" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eventFormData.endDate} onChange={e => setEventFormData({...eventFormData, endDate: e.target.value})} /></div>
+                                <div className="flex items-center gap-2 py-2"><input type="checkbox" id="isActive" checked={eventFormData.isActive} onChange={e => setEventFormData({...eventFormData, isActive: e.target.checked})} className="w-5 h-5 accent-brand-500 rounded" /><label htmlFor="isActive" className="text-sm font-bold text-gray-700">Evento Ativo Atualmente</label></div>
+                            </div>
+                        )}
+                        {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold flex justify-between items-center mb-1">CATEGORIA</label><select required className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.category} onChange={e => setEqFormData({...eqFormData, category: e.target.value})}><option value="">Selecione...</option>{itemList.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}</select></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-brand-600 font-bold">Patrimônio / ID</label><input required type="text" placeholder="Ex: R-01" className="w-full bg-gray-50 border border-brand-200 rounded-lg p-3 font-mono font-bold" value={eqFormData.inventoryNumber} onChange={e => setEqFormData({...eqFormData, inventoryNumber: e.target.value.toUpperCase()})} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Marca</label><input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.brand} onChange={e => setEqFormData({...eqFormData, brand: e.target.value})} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Modelo</label><input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={eqFormData.model} onChange={e => setEqFormData({...eqFormData, model: e.target.value})} /></div>
+                            </div>
+                        )}
+                        {activeTab === 'inventory' && inventorySubTab === 'itens' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Nome da Categoria</label><input required type="text" placeholder="Digite o nome..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 font-bold" value={itemFormData.name} onChange={e => setItemFormData({name: e.target.value})} /></div></div>
+                        )}
+                        {activeTab === 'users' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Nome Completo</label><input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.name} onChange={e => setUserFormData({...userFormData, name: e.target.value})} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Email</label><input required type="email" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.email} onChange={e => setUserFormData({...userFormData, email: e.target.value})} disabled={!!editingId} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">{editingId ? 'Nova Senha' : 'Senha Inicial'}</label><input type="password" placeholder="Mínimo 6 caracteres" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.password} onChange={e => setUserFormData({...userFormData, password: e.target.value})} required={!editingId} /></div>
+                                <div className="space-y-1"><label className="text-xs uppercase text-gray-500 font-bold">Perfil</label><select className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3" value={userFormData.role} onChange={e => setUserFormData({...userFormData, role: e.target.value as UserRole})}><option value="USER">Operador</option><option value="ADMIN">Administrador</option></select></div>
+                            </div>
+                        )}
+                        <div className="flex gap-4 pt-4 border-t border-gray-100"><button type="button" onClick={resetForms} className="flex-1 py-4 border border-gray-200 text-gray-600 font-black rounded-xl hover:bg-gray-50 transition-colors uppercase text-[10px] tracking-widest">Descartar</button><button type="submit" className="flex-1 py-4 bg-brand-500 text-white font-black rounded-xl hover:bg-brand-600 shadow-xl shadow-brand-500/30 flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest"><Save size={18} /> Salvar Registro</button></div>
+                    </form>
+                </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3"><h3 className="text-lg font-black text-gray-900 tracking-tight">Base de Dados</h3><span className="bg-gray-100 text-[10px] font-black text-gray-500 px-2.5 py-1 rounded-full border border-gray-200 uppercase tracking-tighter">{filteredData().length} Itens</span></div>
+                <div className="relative w-full md:w-auto"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} /><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm w-full md:w-72 focus:ring-1 focus:ring-brand-500 focus:outline-none" /></div>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead><tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black"><th className="p-4 md:p-6">Identificação</th><th className="p-4 md:p-6 hidden md:table-cell">Status/Info</th><th className="p-4 md:p-6">Ações</th></tr></thead>
+                        <tbody className="divide-y divide-gray-100">{filteredData().length === 0 ? (<tr><td colSpan={3} className="p-16 text-center text-gray-400 italic font-medium">Nenhum registro encontrado.</td></tr>) : (filteredData().map((item: any) => (<tr key={item.id} className="hover:bg-brand-50/10 transition-colors group"><td className="p-4 md:p-6"><div className="font-bold text-gray-900">{item.name || item.inventoryNumber || item.email}</div></td><td className="p-4 md:p-6 hidden md:table-cell"><div className="text-xs text-gray-500">{item.category || item.role || formatDate(item.startDate)}</div></td><td className="p-4 md:p-6 text-right whitespace-nowrap"><button onClick={() => { setEditingId(item.id); setIsAdding(true); }} className="p-2 text-gray-400 hover:text-brand-600 rounded-lg transition-all"><Pencil size={16}/></button><button onClick={() => { if(confirm('Excluir?')) { /* call delete logic */ } }} className="p-2 text-gray-400 hover:text-red-500 rounded-lg transition-all"><Trash2 size={16}/></button></td></tr>)))}</tbody>
+                    </table>
+                </div>
+            </div>
+          </>
       )}
-
-      {/* LIST SECTION */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-        <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-             <h3 className="text-lg font-black text-gray-900 tracking-tight">Base de Dados</h3>
-             <span className="bg-gray-100 text-[10px] font-black text-gray-500 px-2.5 py-1 rounded-full border border-gray-200 uppercase tracking-tighter">
-                {filteredData().length} Itens
-             </span>
-          </div>
-          <div className="relative w-full md:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-            <input type="text" placeholder="Buscar nesta aba..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm w-full md:w-72 focus:ring-1 focus:ring-brand-500 focus:outline-none" />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-             <table className="w-full text-left border-collapse">
-                <thead>
-                    <tr className="bg-gray-50/50 border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-500 font-black">
-                        <th className="p-4 md:p-6">
-                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Categoria' : 
-                             activeTab === 'sectors' ? 'Sigla' : 
-                             activeTab === 'channels' ? 'Canal' : 
-                             activeTab === 'stock' ? 'Item de Estoque' : 'Identificação'}
-                        </th>
-                        <th className="p-4 md:p-6 hidden md:table-cell">
-                            {activeTab === 'inventory' && inventorySubTab === 'itens' ? 'Criado em' : 
-                             activeTab === 'sectors' ? 'Coordenador' : 
-                             activeTab === 'channels' ? 'Frequência' : 
-                             activeTab === 'stock' ? 'Alerta Mínimo' : 'Status/Info'}
-                        </th>
-                        <th className="p-4 md:p-6">
-                            {activeTab === 'sectors' ? 'Canal' : 
-                             activeTab === 'users' ? 'Status de Acesso' : 
-                             activeTab === 'channels' ? 'Sinal' : 
-                             activeTab === 'stock' ? 'Saldo Atual' : ''}
-                        </th>
-                        <th className="p-4 md:p-6 text-right">Ações</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                    {filteredData().length === 0 ? (
-                        <tr><td colSpan={4} className="p-16 text-center text-gray-400 italic font-medium">Nenhum registro encontrado.</td></tr>
-                    ) : (
-                        filteredData().map((item: any) => {
-                            const channelInfo = activeTab === 'sectors' ? resolveChannelInfo(item.channelId) : null;
-                            return (
-                                <tr key={item.id} className="hover:bg-brand-50/10 transition-colors group">
-                                    {/* COLUNA 1: IDENTIFICAÇÃO PRINCIPAL */}
-                                    <td className="p-4 md:p-6">
-                                        <div className="flex flex-col">
-                                            {activeTab === 'events' && <div className="font-bold text-gray-900">{item.name}</div>}
-                                            {activeTab === 'inventory' && inventorySubTab === 'ativos' && (
-                                                <>
-                                                    <span className="font-mono text-brand-600 font-black text-sm">{item.inventoryNumber}</span>
-                                                    <span className="text-[10px] text-gray-400 uppercase font-bold md:hidden">{item.category} | {item.brand}</span>
-                                                </>
-                                            )}
-                                            {activeTab === 'inventory' && inventorySubTab === 'itens' && <span className="font-bold text-gray-900">{item.name}</span>}
-                                            {activeTab === 'sectors' && (
-                                                <>
-                                                    <div className="font-black text-gray-900 tracking-tighter text-base">{item.name}</div>
-                                                    <div className="text-[10px] text-brand-600 font-bold md:hidden">{item.coordinatorName}</div>
-                                                </>
-                                            )}
-                                            {activeTab === 'channels' && (
-                                                <>
-                                                    <div className="font-black text-gray-900 font-mono text-base">{item.name}</div>
-                                                    <div className="text-[10px] text-brand-600 font-bold md:hidden">{item.frequency} MHz</div>
-                                                </>
-                                            )}
-                                            {activeTab === 'users' && (
-                                                <>
-                                                    <div className="font-bold text-gray-900 text-sm">{item.name}</div>
-                                                    <div className="text-[10px] text-gray-400 font-mono md:hidden">{item.email}</div>
-                                                </>
-                                            )}
-                                            {activeTab === 'stock' && (
-                                                <div className="font-bold text-gray-900">{item.name}</div>
-                                            )}
-                                        </div>
-                                    </td>
-
-                                    {/* COLUNA 2: INFO SECUNDÁRIA (DESKTOP) */}
-                                    <td className="p-4 md:p-6 hidden md:table-cell text-sm">
-                                        {activeTab === 'events' && <div className="text-gray-600 font-medium">{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>}
-                                        {activeTab === 'inventory' && inventorySubTab === 'ativos' && <div className="text-xs text-gray-500 uppercase font-bold">{item.category} | {item.brand} {item.model}</div>}
-                                        {activeTab === 'inventory' && inventorySubTab === 'itens' && <div className="text-gray-500 font-mono text-xs"><Clock size={12} className="inline mr-1"/> {formatDate(item.createdAt)}</div>}
-                                        {activeTab === 'sectors' && (
-                                            <div className="space-y-1">
-                                                <div className="font-bold text-gray-800">{item.coordinatorName || '-'}</div>
-                                                <div className="flex items-center gap-1.5 text-xs text-brand-600 font-bold">
-                                                    <Phone size={12} /> {item.coordinatorPhone || '-'}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {activeTab === 'channels' && <div className="text-xs font-bold text-brand-600">{item.frequency} MHz</div>}
-                                        {activeTab === 'users' && <div className="text-xs font-black text-brand-600 uppercase">{item.role}</div>}
-                                        {activeTab === 'stock' && <div className="text-xs text-gray-500">Mín: <span className="font-bold">{item.minThreshold}</span></div>}
-                                    </td>
-
-                                    {/* COLUNA 3: STATUS / VÍNCULOS (MOBILE & DESKTOP) */}
-                                    <td className="p-4 md:p-6">
-                                        {activeTab === 'events' && (
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
-                                                {item.isActive ? 'Ativo' : 'Finalizado'}
-                                            </span>
-                                        )}
-                                        {activeTab === 'users' && (
-                                            <button 
-                                                onClick={() => onUpdateUser({ ...item, isActive: !item.isActive })}
-                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
-                                                    item.isActive 
-                                                    ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-500/20' 
-                                                    : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200'
-                                                }`}
-                                            >
-                                                {item.isActive ? <Check size={12}/> : <X size={12}/>}
-                                                {item.isActive ? 'Ativo' : 'Inativo'}
-                                            </button>
-                                        )}
-                                        {activeTab === 'channels' && <div className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{item.type}</div>}
-                                        {activeTab === 'sectors' && (
-                                            channelInfo ? (
-                                                <div className="flex items-center gap-2">
-                                                    <RadioIcon size={14} className="text-brand-500 flex-shrink-0" />
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs text-brand-600 font-black font-mono">{channelInfo.name}</span>
-                                                        <span className="text-[9px] text-gray-400 font-bold">{channelInfo.frequency} MHz</span>
-                                                    </div>
-                                                </div>
-                                            ) : <span className="text-[10px] text-gray-300 italic">S/ Vínculo</span>
-                                        )}
-                                        {activeTab === 'stock' && (
-                                            <div className={`font-mono font-bold text-lg ${item.currentStock <= item.minThreshold ? 'text-red-600' : 'text-emerald-600'}`}>
-                                                {item.currentStock}
-                                            </div>
-                                        )}
-                                    </td>
-
-                                    {/* COLUNA 4: AÇÕES */}
-                                    <td className="p-4 md:p-6 text-right space-x-1 whitespace-nowrap">
-                                        <button 
-                                            onClick={() => {
-                                                if (activeTab === 'events') setEventFormData({name: item.name, startDate: item.startDate, endDate: item.endDate, isActive: item.isActive});
-                                                if (activeTab === 'inventory' && inventorySubTab === 'ativos') setEqFormData({inventoryNumber: item.inventoryNumber, brand: item.brand, model: item.model, category: item.category});
-                                                if (activeTab === 'inventory' && inventorySubTab === 'itens') setItemFormData({name: item.name});
-                                                if (activeTab === 'sectors') setSectorFormData({name: item.name, coordinatorName: item.coordinatorName || '', coordinatorPhone: item.coordinatorPhone || '', channelId: item.channelId || ''});
-                                                if (activeTab === 'channels') setChannelFormData({name: item.name, frequency: item.frequency, type: item.type});
-                                                if (activeTab === 'users') setUserFormData({name: item.name, preferredName: item.preferredName || '', email: item.email, phone: item.phone || '', role: item.role, password: '', isActive: item.isActive});
-                                                if (activeTab === 'stock') setStockFormData({ name: item.name, currentStock: item.currentStock, minThreshold: item.minThreshold });
-                                                setEditingId(item.id);
-                                                setIsAdding(true);
-                                            }}
-                                            className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all"
-                                        ><Pencil size={16}/></button>
-                                        <button 
-                                            onClick={async () => {
-                                                if (confirm('Deseja excluir permanentemente?')) {
-                                                    if (activeTab === 'events') onDeleteEvent(item.id);
-                                                    if (activeTab === 'inventory') {
-                                                        if (inventorySubTab === 'ativos') onDeleteEquipment(item.id);
-                                                        else onDeleteItem(item.id);
-                                                    }
-                                                    if (activeTab === 'sectors') onDeleteSector(item.id);
-                                                    if (activeTab === 'channels') onDeleteChannel(item.id);
-                                                    if (activeTab === 'users') onDeleteUser(item.id);
-                                                    if (activeTab === 'stock') {
-                                                        await api.deleteMerchandise(item.id);
-                                                        api.fetchMerchandise().then(setMerchandiseList);
-                                                    }
-                                                }
-                                            }}
-                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                        ><Trash2 size={16}/></button>
-                                    </td>
-                                </tr>
-                            );
-                        })
-                    )}
-                </tbody>
-             </table>
-        </div>
-      </div>
     </div>
   );
 };

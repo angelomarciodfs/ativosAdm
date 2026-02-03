@@ -26,7 +26,7 @@ const mapUser = (u: any): User => ({
   avatarInitials: u.avatar_initials || u.name.substring(0, 2).toUpperCase(),
   preferredName: u.preferred_name,
   phone: u.phone,
-  isActive: u.is_active !== false // Default true se for nulo
+  isActive: u.is_active !== false 
 });
 
 const mapSector = (s: any): Sector => ({
@@ -87,12 +87,18 @@ const mapLegendario = (l: any): Legendario => ({
   email: l.email,
   phone: l.phone,
   registrationNumber: l.registration_number,
-  deliveries: {} // Será populado separadamente ou via join
+  deliveries: {} 
 });
 
 // --- API METHODS ---
 
 export const api = {
+  // MANUTENÇÃO / LIMPEZA
+  resetAllRentals: async () => {
+    const { error } = await supabase.from('rentals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw error;
+  },
+
   // CANAIS
   fetchChannels: async () => {
     const { data, error } = await supabase.from('channels').select('*').order('name');
@@ -316,8 +322,6 @@ export const api = {
       return mapRental(data[0]);
   },
 
-  // --- NOVOS MÉTODOS PINS & PATCHES ---
-  
   fetchMerchandise: async () => {
     const { data, error } = await supabase.from('merchandise').select('*').order('name');
     if (error) throw error;
@@ -346,7 +350,6 @@ export const api = {
     if (error) throw error;
   },
   
-  // Buscar Legendários (e suas entregas)
   searchLegendarios: async (term: string) => {
     const termLike = `%${term}%`;
     const { data, error } = await supabase
@@ -362,7 +365,6 @@ export const api = {
 
     return (data || []).map((l: any) => {
       const leg = mapLegendario(l);
-      // Mapear entregas para um objeto { item_id: data_entrega }
       leg.deliveries = {};
       if (l.deliveries && Array.isArray(l.deliveries)) {
         l.deliveries.forEach((d: any) => {
@@ -386,7 +388,6 @@ export const api = {
     return mapLegendario(data);
   },
 
-  // Importação em massa
   importLegendarios: async (legendarios: Omit<Legendario, 'id'>[]) => {
     const { data, error } = await supabase.from('legendarios').insert(
       legendarios.map(l => ({
@@ -401,20 +402,15 @@ export const api = {
     return data.length;
   },
 
-  // Verificar CPFs existentes para importação
   checkExistingCPFs: async (cpfs: string[]) => {
     const { data, error } = await supabase.from('legendarios').select('cpf').in('cpf', cpfs);
     if (error) throw error;
     return (data || []).map((i: any) => i.cpf);
   },
 
-  // Registrar entrega
   deliverItem: async (legendarioId: string, merchandiseId: string, userId: string) => {
-    // 1. Decrementar estoque
     const { error: stockError } = await supabase.rpc('decrement_stock', { item_id: merchandiseId });
-    // Se a função RPC não existir, fazemos via update normal (menos seguro para concorrência, mas funcional)
     if (stockError) {
-       // Fallback: Ler e atualizar
        const { data: item } = await supabase.from('merchandise').select('current_stock').eq('id', merchandiseId).single();
        if (item && item.current_stock > 0) {
           await supabase.from('merchandise').update({ current_stock: item.current_stock - 1 }).eq('id', merchandiseId);
@@ -423,7 +419,6 @@ export const api = {
        }
     }
 
-    // 2. Registrar entrega
     const { error } = await supabase.from('deliveries').insert({
       legendario_id: legendarioId,
       merchandise_id: merchandiseId,
@@ -434,7 +429,6 @@ export const api = {
     return new Date().toISOString();
   },
 
-  // Atualizar data da entrega
   updateDeliveryDate: async (legendarioId: string, merchandiseId: string, newDate: string) => {
     const { error } = await supabase.from('deliveries')
       .update({ delivered_at: newDate })
@@ -443,16 +437,13 @@ export const api = {
     if (error) throw error;
   },
 
-  // Cancelar entrega (Undo)
   undoDelivery: async (legendarioId: string, merchandiseId: string) => {
-    // 1. Remover registro de entrega
     const { error } = await supabase.from('deliveries')
         .delete()
         .match({ legendario_id: legendarioId, merchandise_id: merchandiseId });
     
     if (error) throw error;
 
-    // 2. Incrementar estoque (Devolver item)
     const { data: item } = await supabase.from('merchandise').select('current_stock').eq('id', merchandiseId).single();
     if (item) {
         await supabase.from('merchandise').update({ current_stock: item.current_stock + 1 }).eq('id', merchandiseId);

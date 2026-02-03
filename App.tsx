@@ -24,7 +24,7 @@ const InventoryStatusChart = ({ equipment, rentals, items }: { equipment: Equipm
       // Total de equipamentos físicos cadastrados nesta categoria
       const totalInventory = equipment.filter(e => e.category === itemName).length;
       
-      // Cálculo preciso de itens locados cruzando serialNumber com a categoria do equipamento
+      // Cálculo preciso de itens locados cruzando serialNumber (Patrimônio) com a categoria do equipamento original
       let totalRented = 0;
       activeRentals.forEach(rental => {
           const eq = equipment.find(e => e.inventoryNumber === rental.serialNumber);
@@ -120,7 +120,7 @@ const App: React.FC = () => {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   
-  const [configTab, setConfigTab] = useState<'events' | 'inventory' | 'sectors' | 'users' | 'channels' | 'stock'>('events');
+  const [configTab, setConfigTab] = useState<'events' | 'inventory' | 'sectors' | 'users' | 'channels' | 'stock' | 'system'>('events');
   const [configInventorySubTab, setConfigInventorySubTab] = useState<'ativos' | 'itens'>('ativos');
 
   const [rentals, setRentals] = useState<Rental[]>([]);
