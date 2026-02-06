@@ -21,10 +21,7 @@ const InventoryStatusChart = ({ equipment, rentals, items }: { equipment: Equipm
   const activeRentals = rentals.filter(r => r.status === RentalStatus.ACTIVE || r.status === RentalStatus.OVERDUE || r.status === RentalStatus.PARTIAL);
 
   const getStats = (itemName: string) => {
-      // Total de equipamentos físicos cadastrados nesta categoria
       const totalInventory = equipment.filter(e => e.category === itemName).length;
-      
-      // Cálculo preciso de itens locados cruzando serialNumber (Patrimônio) com a categoria do equipamento original
       let totalRented = 0;
       activeRentals.forEach(rental => {
           const eq = equipment.find(e => e.inventoryNumber === rental.serialNumber);
@@ -32,7 +29,6 @@ const InventoryStatusChart = ({ equipment, rentals, items }: { equipment: Equipm
               totalRented++;
           }
       });
-
       const available = Math.max(0, totalInventory - totalRented);
       const percentUsed = totalInventory > 0 ? (totalRented / totalInventory) * 100 : 0;
       return { totalInventory, totalRented, available, percentUsed };
@@ -48,27 +44,23 @@ const InventoryStatusChart = ({ equipment, rentals, items }: { equipment: Equipm
   };
 
   return (
-    <div className="flex flex-col justify-center h-full gap-5 px-2">
-       {items.length > 0 ? items.slice(0, 4).map((item) => {
+    <div className="flex flex-col justify-center h-full gap-4 px-1">
+       {items.length > 0 ? items.slice(0, 5).map((item) => {
            const stats = getStats(item.name);
            const Icon = getIcon(item.name);
            return (
-               <div key={item.id} className="space-y-2">
+               <div key={item.id} className="space-y-1.5">
                    <div className="flex justify-between items-end">
-                       <div className="flex items-center gap-2 text-gray-700">
-                           <Icon size={16} className="text-brand-600" />
-                           <span className="font-bold text-sm">{item.name}</span>
+                       <div className="flex items-center gap-1.5 text-gray-700">
+                           <Icon size={14} className="text-brand-600" />
+                           <span className="font-bold text-xs truncate max-w-[100px]">{item.name}</span>
                        </div>
-                       <div className="text-xs text-gray-500 font-mono">
-                           <span className="text-brand-600 font-bold">{stats.totalRented}</span> em uso / <span className="text-gray-900">{stats.available}</span> disp.
+                       <div className="text-[10px] text-gray-500 font-mono">
+                           <span className="text-brand-600 font-bold">{stats.totalRented}</span>/{stats.totalInventory}
                        </div>
                    </div>
-                   <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden border border-gray-300 relative">
+                   <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden border border-gray-100 relative">
                        <div className={`h-full rounded-full transition-all duration-700 ${stats.percentUsed > 90 ? 'bg-red-500' : 'bg-brand-500'}`} style={{ width: `${Math.min(stats.percentUsed, 100)}%` }} />
-                   </div>
-                   <div className="flex justify-between text-[10px] text-gray-400 uppercase tracking-wider font-bold">
-                       <span>Estoque: {stats.totalInventory}</span>
-                       <span>{Math.round(stats.percentUsed)}% Alocado</span>
                    </div>
                </div>
            );
@@ -77,37 +69,54 @@ const InventoryStatusChart = ({ equipment, rentals, items }: { equipment: Equipm
   );
 };
 
-const COLORS = ['#f59e0b', '#b45309', '#1f2937', '#6b7280', '#d97706', '#fbbf24', '#9ca3af', '#4b5563'];
+const COLORS = ['#f59e0b', '#1f2937', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
 
 const SectorAllocationChart = ({ data }: { data: { name: string, count: number }[] }) => {
-  if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-gray-400 text-xs">Sem dados de alocação</div>;
+  if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-gray-400 text-xs italic">Sem dados de alocação no momento</div>;
+  
   const total = data.reduce((acc, curr) => acc + curr.count, 0);
+
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 25;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+      <text x={x} y={y} fill="#4b5563" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[10px] font-black uppercase tracking-tighter">
+        {`${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+      </text>
+    );
+  };
+
   return (
-    <div className="h-full w-full flex items-center gap-2">
-       <div className="w-1/2 h-full relative">
-         <ResponsiveContainer width="100%" height="100%">
-            <RechartsPieChart>
-              <Pie data={data} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="count" stroke="none">
-                {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-              </Pie>
-              <Tooltip formatter={(value: number) => [`${value} itens`, 'Qtd']} />
-            </RechartsPieChart>
-         </ResponsiveContainer>
-         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-            <div className="text-xl font-bold text-gray-900">{total}</div>
-            <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Total</div>
-         </div>
-       </div>
-       <div className="w-1/2 h-[85%] overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-2">
-            {data.map((item, index) => (
-               <div key={index} className="flex items-center justify-between text-xs group p-1 hover:bg-gray-50 rounded transition-colors">
-                  <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
-                      <span className="text-gray-600 font-medium truncate">{item.name}</span>
-                  </div>
-                  <span className="font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">{Math.round((item.count/total)*100)}%</span>
-               </div>
-            ))}
+    <div className="h-full w-full relative">
+       <ResponsiveContainer width="100%" height="100%">
+          <RechartsPieChart margin={{ top: 20, right: 30, left: 30, bottom: 20 }}>
+            <Pie 
+              data={data} 
+              cx="50%" 
+              cy="50%" 
+              innerRadius={55} 
+              outerRadius={85} 
+              paddingAngle={3} 
+              dataKey="count" 
+              stroke="#fff"
+              strokeWidth={2}
+              label={renderCustomizedLabel}
+              labelLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
+            >
+              {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" />)}
+            </Pie>
+            <Tooltip 
+               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+               itemStyle={{ fontWeight: 'bold', fontSize: '12px' }}
+            />
+          </RechartsPieChart>
+       </ResponsiveContainer>
+       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+          <div className="text-2xl font-black text-gray-900 leading-none">{total}</div>
+          <div className="text-[9px] text-gray-400 uppercase font-black tracking-widest mt-1">Ativos</div>
        </div>
     </div>
   );
@@ -315,14 +324,14 @@ const App: React.FC = () => {
                 )}
             </div>
 
-            {/* CHARTS SECTION */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
-                <h3 className="text-[11px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2 tracking-widest"><Zap size={14} className="text-brand-600" /> Inventário por ITEM</h3>
-                <div className="flex-1 mt-2"><InventoryStatusChart equipment={equipmentList} rentals={eventRentals} currentEvent={currentEvent} items={items} /></div>
+            {/* CHARTS SECTION - Alterado para grid-cols-2 equilibrado */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-[380px]">
+                <h3 className="text-[11px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2 tracking-widest uppercase"><Zap size={14} className="text-brand-600" /> Inventário por ITEM</h3>
+                <div className="flex-1 mt-2 overflow-y-auto custom-scrollbar"><InventoryStatusChart equipment={equipmentList} rentals={eventRentals} currentEvent={currentEvent} items={items} /></div>
               </div>
-              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-80">
-                 <h3 className="text-[11px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2 tracking-widest"><PieChart size={14} className="text-brand-600" /> Alocação por Setor</h3>
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-[380px]">
+                 <h3 className="text-[11px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2 tracking-widest uppercase"><PieChart size={14} className="text-brand-600" /> Alocação por Setor</h3>
                  <div className="flex-1 overflow-hidden h-full"><SectorAllocationChart data={sectorAllocation} /></div>
               </div>
             </div>
