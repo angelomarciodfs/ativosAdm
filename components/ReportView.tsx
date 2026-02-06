@@ -144,11 +144,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ rentals, equipment, curr
         if (activeRentals.length === 0 && eventRentals.length > 0) {
              message += `✅ *Todos os equipamentos deste evento foram devolvidos.*\n\n`;
         } else if (activeRentals.length > 0) {
-             message += `ℹ️ *Ainda existem ${activeRentals.length} equipamentos em uso.*\n\n`;
+             message += `ℹ️ *Existem ${activeRentals.length} equipamentos em uso.*\n\n`;
         }
     }
 
-    message += `_Sistema de Ativos - Legendários_`;
+    message += `_Sistema de Ativos ADM - Legendários_`;
     return message;
   };
 
